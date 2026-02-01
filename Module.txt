@@ -1,0 +1,347 @@
+🔷 Project Build Strategy (IMPORTANT)
+
+We will NOT build everything together.
+
+Instead we will follow this strict order:
+
+Setup → Auth → Core Ride → Client Flow → Driver Flow → Live Tracking → Payment → Polish
+
+Each module will have:
+
+✅ Backend APIs + DB models
+
+✅ Frontend pages + state
+
+✅ Integration tested
+
+✅ Then move to next module
+
+🧱 MODULE BREAKDOWN (FROM SCRATCH)
+🔹 MODULE 0: Project Setup & Base Architecture
+Backend
+
+Node + Express setup
+
+MongoDB connection
+
+Folder structure (as per PDF)
+
+Environment config
+
+Basic server health API
+
+Deliverables
+
+server.js, app.js
+
+DB connected
+
+Postman test working
+
+Frontend
+
+Vite + React + Tailwind setup
+
+Folder structure
+
+Routing setup
+
+Empty pages scaffolded
+
+Deliverables
+
+App runs
+
+Tailwind working
+
+Routes visible
+
+⏭️ Only after this → move forward
+
+🔹 MODULE 1: Authentication & User Management
+Backend
+
+User model
+
+Signup (email → OTP → details)
+
+Login (password / OTP)
+
+JWT auth
+
+Role handling (client / driver)
+
+APIs
+
+/auth/signup
+
+/auth/verify-otp
+
+/auth/login
+
+/auth/me
+
+Frontend
+
+Signup pages (step-wise)
+
+Login page
+
+OTP verification page
+
+AuthContext
+
+Protected routes
+
+Outcome
+
+Client & Driver can login
+
+Redirect to correct dashboard
+
+🔹 MODULE 2: Client Dashboard (Basic)
+Backend
+
+Client profile API
+
+Ride history (empty for now)
+
+Frontend
+
+Client dashboard UI
+
+Header greeting
+
+Navigation
+
+Outcome
+
+Logged-in client sees dashboard
+
+🔹 MODULE 3: Ride Fare Calculation Engine (Core Logic)
+
+⚠️ This is a core module – everything depends on it
+
+Backend
+
+Fare calculation service
+
+Distance-based logic
+
+Time-based booking logic
+
+Waiting charge rules
+
+Frontend
+
+Fare breakdown component
+
+Live estimated price update
+
+Outcome
+
+Accurate fare before booking
+
+🔹 MODULE 4: Ride Booking (Client Side)
+Backend
+
+Ride model
+
+Create ride API
+
+Ride state = REQUESTED
+
+Client cancellation logic
+
+Daily cancellation limit
+
+Frontend
+
+Book Ride page
+
+Pickup / Drop selection
+
+Booking type selection
+
+Payment mode selection
+
+Outcome
+
+Client can create ride request
+
+🔹 MODULE 5: Driver KYC System
+Backend
+
+KYC model
+
+Document upload (Cloudinary)
+
+KYC status flow
+
+Frontend
+
+KYC form page
+
+Upload UI
+
+Status display
+
+Outcome
+
+Driver must complete KYC to go online
+
+🔹 MODULE 6: Driver Availability & Ride Requests
+Backend
+
+Driver online/offline status
+
+Assign nearest driver
+
+Ride request timeout logic
+
+Frontend
+
+Driver dashboard
+
+Ride request cards
+
+Accept / Reject actions
+
+Outcome
+
+Drivers receive & accept rides
+
+🔹 MODULE 7: Ride Acceptance & OTP Flow
+Backend
+
+Ride state transitions
+
+OTP generation & verification
+
+Frontend
+
+OTP input UI
+
+Ride start confirmation
+
+Outcome
+
+Secure ride start
+
+🔹 MODULE 8: Live Ride Tracking (Sockets)
+Backend
+
+Socket setup
+
+Location updates
+
+Ride status events
+
+Frontend
+
+Map view
+
+Driver live location
+
+Route visualization
+
+Outcome
+
+Real-time ride tracking
+
+🔹 MODULE 9: Waiting Time & Extra Charges
+Backend
+
+WaitingLog model
+
+Extra waiting calculation
+
+Real-time fare update
+
+Frontend
+
+Live fare update UI
+
+Waiting timer display
+
+Outcome
+
+Fair & automatic extra charges
+
+🔹 MODULE 10: Payment Handling
+Backend
+
+Razorpay integration
+
+Pay after ride logic
+
+Payment verification
+
+Frontend
+
+Pay now / Pay later UI
+
+QR display for driver
+
+Payment status updates
+
+Outcome
+
+Ride payment completed correctly
+
+🔹 MODULE 11: Ride Completion & History
+Backend
+
+Complete ride API
+
+Final fare locking
+
+History APIs
+
+Frontend
+
+Ride summary
+
+Client & Driver history pages
+
+🔹 MODULE 12: Chat, Call & SOS (Enhancement)
+Backend
+
+Chat model
+
+Socket chat events
+
+SOS trigger API
+
+Frontend
+
+Chat UI
+
+Call button
+
+SOS button
+
+🔹 MODULE 13: Final Polish & Production Prep
+
+Error handling
+
+Loading states
+
+Edge cases
+
+Deployment readiness
+
+🧠 HOW WE SHOULD PROCEED (My Recommendation)
+
+👉 Next step:
+We should start with MODULE 0 and I will:
+
+Design exact folder structure
+
+Write backend setup code
+
+Write frontend setup code
+
+Explain why each file exists
+
+Then we move module by module.

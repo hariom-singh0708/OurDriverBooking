@@ -1,0 +1,17 @@
+import express from "express";
+import {
+  signup,
+  verifySignupOTP,
+  login,
+  getMe,
+} from "../controllers/auth.controller.js";
+import { protect } from "../middlewares/auth.middleware.js";
+
+const router = express.Router();
+
+router.post("/signup", signup);
+router.post("/verify-otp", verifySignupOTP);
+router.post("/login", login);
+router.get("/me", protect, getMe);
+
+export default router;
