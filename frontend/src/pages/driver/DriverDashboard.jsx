@@ -6,7 +6,6 @@ import {
   getRideRequest,
   acceptRide,
   rejectRide,
-  getDriverStatus,
 } from "../../services/driver.api";
 
 import { getKYCStatus } from "../../services/kyc.api";
@@ -16,36 +15,25 @@ import DriverRideStart from "./DriverRideStart";
 export default function DriverDashboard() {
   const navigate = useNavigate();
 
-  // null = loading, true = online, false = offline
-  const [online, setOnline] = useState(null);
+  const [online, setOnline] = useState(false);
   const [ride, setRide] = useState(null);
   const [kycStatus, setKycStatus] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  /* ================== LOAD KYC ================== */
+  /* ================== KYC CHECK ================== */
   useEffect(() => {
     getKYCStatus().then((res) => {
       setKycStatus(res.data.data?.status);
     });
   }, []);
 
-  /* ================== LOAD DRIVER STATUS ================== */
-  useEffect(() => {
-    const loadStatus = async () => {
-      try {
-        const res = await getDriverStatus();
-        setOnline(res.data.data.isOnline);
-      } catch {
-        setOnline(false);
-      }
-    };
-    loadStatus();
-  }, []);
-
-  /* ================== TOGGLE STATUS ================== */
+  /* ================== TOGGLE ONLINE ================== */
   const toggleStatus = async () => {
-    setError("");
+    if (kycStatus !== "approved") {
+      alert("Complete & approve KYC to go online");
+      return;
+    }
+
     try {
       setLoading(true);
       const res = await toggleDriverStatus({
@@ -55,132 +43,127 @@ export default function DriverDashboard() {
       });
       setOnline(res.data.data.isOnline);
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to change status");
+      alert(err.response?.data?.message || "Status change failed");
     } finally {
       setLoading(false);
     }
   };
 
-  /* ================== POLL RIDES ================== */
+  /* ================== POLL RIDE REQUEST ================== */
   useEffect(() => {
-    if (online !== true || ride) return;
+    if (!online || ride) return;
 
     const interval = setInterval(async () => {
       const res = await getRideRequest();
-      if (res.data.data) setRide(res.data.data);
+      if (res.data.data) {
+        setRide(res.data.data);
+      }
     }, 5000);
 
     return () => clearInterval(interval);
   }, [online, ride]);
 
-  /* ================== ACCEPT ================== */
+  /* ================== ACCEPT RIDE ================== */
   const handleAccept = async () => {
-    const res = await acceptRide(ride._id);
-    setRide({ ...ride, status: "ACCEPTED", otp: res.data?.data?.otp });
+    try {
+      const res = await acceptRide(ride._id);
+      setRide({
+        ...ride,
+        status: "ACCEPTED",
+        otp: res.data?.data?.otp,
+      });
+    } catch {
+      alert("Failed to accept ride");
+    }
   };
 
-  /* ================== REJECT ================== */
+  /* ================== REJECT RIDE ================== */
   const handleReject = async () => {
     await rejectRide(ride._id);
     setRide(null);
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 p-6">
       {/* HEADER */}
-      <div className="max-w-4xl mx-auto space-y-4">
-
-        <h1 className="text-2xl font-semibold text-slate-900">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-extrabold text-gray-800">
           Driver Dashboard
         </h1>
 
-        {/* KYC BANNER */}
-        {kycStatus !== "approved" && (
-          <div className="flex items-center justify-between bg-yellow-100 border border-yellow-300 rounded-xl p-4">
-            <div>
-              <p className="font-medium text-yellow-900">
-                KYC not completed
-              </p>
-              <p className="text-sm text-yellow-800">
-                Complete KYC to start receiving rides
-              </p>
-            </div>
-            <button
-              onClick={() => navigate("/driver/kyc")}
-              className="px-4 py-2 rounded-lg bg-yellow-600 text-white hover:bg-yellow-700"
-            >
-              Complete KYC
-            </button>
-          </div>
-        )}
+        <button
+          onClick={() => navigate("/driver/history")}
+          className="text-sm font-semibold text-gray-700 hover:text-black"
+        >
+          Ride History →
+        </button>
+      </div>
 
-        {/* STATUS CARD */}
-        <div className="bg-white rounded-2xl shadow p-6 flex items-center justify-between">
+      {/* KYC ALERT */}
+      {kycStatus !== "approved" && (
+        <div className="mb-6 rounded-xl border border-yellow-300 bg-yellow-100 p-5 shadow">
+          <p className="font-semibold text-yellow-800">
+            ⚠ Complete your KYC to earn money and get rides
+          </p>
+          <button
+            onClick={() => navigate("/driver/kyc")}
+            className="mt-3 rounded-lg bg-black px-5 py-2 text-white hover:bg-gray-900"
+          >
+            Complete KYC
+          </button>
+        </div>
+      )}
+
+      {/* STATUS CARD */}
+      <div className="mb-6 rounded-xl bg-white p-6 shadow-md">
+        <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-slate-500">Current Status</p>
+            <p className="text-sm text-gray-500">Current Status</p>
             <p
-              className={`text-xl font-semibold ${
+              className={`text-xl font-bold ${
                 online ? "text-green-600" : "text-red-600"
               }`}
             >
-              {online === null
-                ? "Checking..."
-                : online
-                ? "Online"
-                : "Offline"}
+              {online ? "ONLINE" : "OFFLINE"}
             </p>
           </div>
 
           <button
-            disabled={loading || online === null || kycStatus !== "approved"}
+            disabled={loading}
             onClick={toggleStatus}
-            className={`h-12 px-6 rounded-full text-white font-medium transition
-              ${
-                online
-                  ? "bg-red-600 hover:bg-red-700"
-                  : "bg-green-600 hover:bg-green-700"
-              }
-              disabled:opacity-50
-            `}
+            className={`rounded-full px-6 py-2 font-semibold text-white transition ${
+              online
+                ? "bg-red-600 hover:bg-red-700"
+                : "bg-green-600 hover:bg-green-700"
+            }`}
           >
-            {loading
-              ? "Please wait..."
-              : online
-              ? "Go Offline"
-              : "Go Online"}
+            {loading ? "Please wait..." : online ? "Go Offline" : "Go Online"}
           </button>
         </div>
+      </div>
 
-        {error && (
-          <div className="bg-red-100 border border-red-300 text-red-700 p-3 rounded-lg">
-            {error}
-          </div>
-        )}
-
-        {/* ACTIONS */}
-        <div className="flex justify-end">
-          <button
-            onClick={() => navigate("/driver/history")}
-            className="text-sm text-slate-600 hover:text-slate-900 underline"
-          >
-            View Ride History
-          </button>
-        </div>
-
-        {/* RIDE REQUEST */}
-        {ride && ride.status === "REQUESTED" && (
+      {/* RIDE FLOW */}
+      {ride && ride.status === "REQUESTED" && (
+        <div className="animate-fade-in">
           <RideRequestCard
             ride={ride}
             onAccept={handleAccept}
             onReject={handleReject}
           />
-        )}
+        </div>
+      )}
 
-        {/* ACCEPTED */}
-        {ride && ride.status === "ACCEPTED" && (
+      {ride && ride.status === "ACCEPTED" && (
+        <div className="animate-fade-in">
           <DriverRideStart ride={ride} />
-        )}
-      </div>
+        </div>
+      )}
+
+      {!ride && online && (
+        <div className="rounded-xl bg-white p-6 text-center text-gray-500 shadow">
+          Waiting for ride requests…
+        </div>
+      )}
     </div>
   );
 }

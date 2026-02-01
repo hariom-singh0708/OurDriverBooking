@@ -1,107 +1,171 @@
 import { Routes, Route } from "react-router-dom";
+
 import Login from "../pages/auth/Login";
 import Signup from "../pages/auth/Signup";
 import VerifyOTP from "../pages/auth/VerifyOTP";
-import ClientDashboard from "../pages/client/ClientDashboard";
-import DriverDashboard from "../pages/driver/DriverDashboard";
-import ProtectedRoute from "./ProtectedRoute";
-import NotFound from "../pages/NotFound";
-import FareCalculator from "../pages/client/FareCalculator";
-import BookRide from "../pages/client/BookRide";
-import KYC from "../pages/driver/KYC";
-import LiveRide from "../pages/client/LiveRide";
-import DriverLiveRide from "../pages/driver/DriverLiveRide";
 
+import ClientDashboard from "../pages/client/ClientDashboard";
+import BookRide from "../pages/client/BookRide";
 import ClientHistory from "../pages/client/ClientHistory";
+import ClientProfile from "../pages/client/Profile";
+import LiveRide from "../pages/client/LiveRide";
+
+import DriverDashboard from "../pages/driver/DriverDashboard";
 import DriverHistory from "../pages/driver/DriverHistory";
+import DriverProfile from "../pages/driver/Profile";
+import DriverLiveRide from "../pages/driver/DriverLiveRide";
+import KYC from "../pages/driver/KYC";
+
+import FareCalculator from "../pages/client/FareCalculator";
+import NotFound from "../pages/NotFound";
+
+import ProtectedRoute from "./ProtectedRoute";
+
+/* ✅ COMMON NAVBAR (CLIENT + DRIVER) */
+import AppNavbar from "../components/AppNavbar";
 
 export default function AppRoutes() {
   return (
     <Routes>
+      {/* ================= AUTH ================= */}
       <Route path="/" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/verify-otp" element={<VerifyOTP />} />
 
+      {/* ================= CLIENT ================= */}
       <Route
         path="/client"
         element={
           <ProtectedRoute>
-            <ClientDashboard />
+            <>
+              <AppNavbar />
+              <ClientDashboard />
+            </>
           </ProtectedRoute>
         }
       />
 
       <Route
-        path="/driver"
+        path="/client/book"
         element={
           <ProtectedRoute>
-            <DriverDashboard />
+            <>
+              <AppNavbar />
+              <BookRide />
+            </>
           </ProtectedRoute>
         }
       />
 
+      <Route
+        path="/client/history"
+        element={
+          <ProtectedRoute>
+            <>
+              <AppNavbar />
+              <ClientHistory />
+            </>
+          </ProtectedRoute>
+        }
+      />
 
-<Route
-  path="/fare-test"
-  element={
-    <ProtectedRoute>
-      <FareCalculator />
-    </ProtectedRoute>
-  }
-/>
+      <Route
+        path="/client/profile"
+        element={
+          <ProtectedRoute>
+            <>
+              <AppNavbar />
+              <ClientProfile />
+            </>
+          </ProtectedRoute>
+        }
+      />
 
+      <Route
+        path="/client/live/:rideId"
+        element={
+          <ProtectedRoute>
+            <>
+              <AppNavbar />
+              <LiveRide />
+            </>
+          </ProtectedRoute>
+        }
+      />
 
-<Route
-  path="/client/book"
-  element={
-    <ProtectedRoute>
-      <BookRide />
-    </ProtectedRoute>
-  }
-/>
+      {/* ================= DRIVER ================= */}
+      <Route
+        path="/driver"
+        element={
+          <ProtectedRoute>
+            <>
+              <AppNavbar />
+              <DriverDashboard />
+            </>
+          </ProtectedRoute>
+        }
+      />
 
+      <Route
+        path="/driver/history"
+        element={
+          <ProtectedRoute>
+            <>
+              <AppNavbar />
+              <DriverHistory />
+            </>
+          </ProtectedRoute>
+        }
+      />
 
-<Route
-  path="/driver/kyc"
-  element={
-    <ProtectedRoute>
-      <KYC />
-    </ProtectedRoute>
-  }
-/>
+      <Route
+        path="/driver/profile"
+        element={
+          <ProtectedRoute>
+            <>
+              <AppNavbar />
+              <DriverProfile />
+            </>
+          </ProtectedRoute>
+        }
+      />
 
+      <Route
+        path="/driver/kyc"
+        element={
+          <ProtectedRoute>
+            <>
+              <AppNavbar />
+              <KYC />
+            </>
+          </ProtectedRoute>
+        }
+      />
 
+      <Route
+        path="/driver/live/:rideId"
+        element={
+          <ProtectedRoute>
+            <>
+              <AppNavbar />
+              <DriverLiveRide />
+            </>
+          </ProtectedRoute>
+        }
+      />
 
-<Route
-  path="/client/live/:rideId"
-  element={<LiveRide />}
-/>
-
-<Route
-  path="/driver/live/:rideId"
-  element={<DriverLiveRide />}
-/>
-
-
-<Route
-  path="/client/history"
-  element={
-    <ProtectedRoute>
-      <ClientHistory />
-    </ProtectedRoute>
-  }
-/>
-
-<Route
-  path="/driver/history"
-  element={
-    <ProtectedRoute>
-      <DriverHistory />
-    </ProtectedRoute>
-  }
-/>
-
-
+      {/* ================= OTHER ================= */}
+      <Route
+        path="/fare-test"
+        element={
+          <ProtectedRoute>
+            <>
+              <AppNavbar />
+              <FareCalculator />
+            </>
+          </ProtectedRoute>
+        }
+      />
 
       <Route path="*" element={<NotFound />} />
     </Routes>

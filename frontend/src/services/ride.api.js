@@ -21,3 +21,23 @@ export const cancelRide = (rideId) =>
       },
     }
   );
+
+  // 👉 Razorpay create order
+export const createPaymentOrder = (rideId) =>
+  axios.post(
+    "http://localhost:5000/payments/create-order",
+    { rideId },
+    {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    }
+  );
+
+// 👉 Razorpay verify payment
+export const verifyPayment = (data) =>
+  axios.post("http://localhost:5000/payments/verify", data, {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+  });
