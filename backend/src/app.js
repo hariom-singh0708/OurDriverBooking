@@ -12,6 +12,7 @@ import rideCompletionRoutes from "./routes/rideCompletion.routes.js";
 import historyRoutes from "./routes/history.routes.js";
 import chatRoutes from "./routes/chat.routes.js";
 import sosRoutes from "./routes/sos.routes.js";
+import adminRoutes from "./routes/admin.routes.js";
 
 
 
@@ -42,6 +43,7 @@ app.use("/rides", rideCompletionRoutes);
 app.use("/history", historyRoutes);
 app.use("/chat", chatRoutes);
 app.use("/sos", sosRoutes);
+app.use("/admin", adminRoutes);
 
 
 

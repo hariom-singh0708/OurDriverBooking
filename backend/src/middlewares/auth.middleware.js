@@ -10,3 +10,10 @@ export const protect = async (req, res, next) => {
   req.user = await User.findById(decoded.id).select("-password");
   next();
 };
+
+export const requireRole = (...roles) => (req, res, next) => {
+  if (!req.user?.role || !roles.includes(req.user.role)) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+  next();
+};
