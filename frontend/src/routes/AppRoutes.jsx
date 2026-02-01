@@ -14,11 +14,26 @@ import DriverLiveRide from "../pages/driver/DriverLiveRide";
 
 import ClientHistory from "../pages/client/ClientHistory";
 import DriverHistory from "../pages/driver/DriverHistory";
+import HomePage from "../pages/Home/HomePage";
+import AdminDrivers from "../pages/admin/Drivers";
+import AdminRides from "../pages/admin/Rides";
+import AdminDashboard from "../pages/admin/Dashboard";
+import AdminSOS from "../pages/admin/SOS";
 
 export default function AppRoutes() {
   return (
     <Routes>
+      <Route path="/home" element={<HomePage />} />
       <Route path="/" element={<Login />} />
+      <Route path="/admin/dashboard" element={<AdminDashboard />} />
+      <Route path="/admin/drivers" element={<AdminDrivers />} />
+      <Route path="/admin/rides" element={<AdminRides />} />
+<Route path="/admin/sos" element={
+    <AdminSOS />
+} />
+
+
+
       <Route path="/signup" element={<Signup />} />
       <Route path="/verify-otp" element={<VerifyOTP />} />
 
@@ -27,7 +42,7 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <ClientDashboard />
-          </ProtectedRoute>
+           </ProtectedRoute>
         }
       />
 

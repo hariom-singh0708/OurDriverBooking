@@ -18,7 +18,9 @@ export default function Login() {
     login(res.data.data.token, res.data.data.role);
 
     if (res.data.data.role === "client") navigate("/client");
-    else navigate("/driver");
+    else if(res.data.data.role === "driver")
+      navigate("/driver");
+      else navigate("/admin/dashboard");
   };
 
   return (

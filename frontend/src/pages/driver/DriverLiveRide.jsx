@@ -22,6 +22,7 @@ export default function DriverLiveRide() {
     socket.emit("join_ride", rideId);
   }, [socket, rideId]);
 
+  
   /* ================= LOCATION STREAM ================= */
   useEffect(() => {
     setSendingLocation(true);
