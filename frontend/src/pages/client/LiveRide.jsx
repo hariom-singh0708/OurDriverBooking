@@ -1,6 +1,7 @@
 import { useEffect, useState, useContext } from "react";
 import { useParams } from "react-router-dom";
 import { SocketContext } from "../../context/SocketContext";
+import { rateDriver } from "../../services/client.api";
 
 import MapView from "../../components/MapView";
 import LiveFare from "../../components/LiveFare";
@@ -17,34 +18,35 @@ export default function LiveRide() {
   const [rideStatus, setRideStatus] = useState("WAITING");
   const [otp, setOtp] = useState(null);
 
+  /* ⭐ RATING STATE */
+  const [showRating, setShowRating] = useState(false);
+  const [rating, setRating] = useState(5);
+  const [feedback, setFeedback] = useState("");
+
   /* ================= SOCKET SETUP ================= */
   useEffect(() => {
     if (!socket) return;
 
     socket.emit("join_ride", rideId);
 
-    // Driver location updates
     socket.on("driver_location_update", (data) => {
-      setDriverLocation({
-        lat: data.lat,
-        lng: data.lng,
-      });
+      setDriverLocation({ lat: data.lat, lng: data.lng });
     });
 
-    // Ride status updates (OTP / ON_RIDE)
     socket.on("ride_status_update", (data) => {
       setRideStatus(data.status);
-      if (data.otp) {
-        setOtp(data.otp);
+      if (data.otp) setOtp(data.otp);
+
+      /* ⭐ SHOW RATING POPUP */
+      if (data.status === "COMPLETED") {
+        setShowRating(true);
       }
     });
 
-    // Waiting fare updates
     socket.on("waiting_time_update", (data) => {
       setFare(data.updatedFare);
     });
 
-    // SOS
     socket.on("sos_triggered", () => {
       alert("🚨 SOS triggered!");
     });
@@ -57,43 +59,76 @@ export default function LiveRide() {
     };
   }, [socket, rideId]);
 
-  /* ================= UI ================= */
+  /* ================= SUBMIT RATING ================= */
+  const submitRating = async () => {
+    await rateDriver({
+      rideId,
+      rating,
+      feedback,
+    });
+
+    setShowRating(false);
+    alert("Thanks for rating the driver ⭐");
+  };
+
   return (
     <div className="p-6 space-y-4 bg-gray-100 min-h-screen">
       <h2 className="text-xl font-bold">Live Ride Tracking</h2>
 
-      {/* STATUS */}
       <div className="bg-white p-3 rounded">
-        <p>
-          <b>Status:</b> {rideStatus}
-        </p>
+        <b>Status:</b> {rideStatus}
       </div>
 
-      {/* OTP DISPLAY */}
       {otp && rideStatus !== "ON_RIDE" && (
         <div className="bg-yellow-100 p-4 rounded text-center">
           <p className="font-bold">Your Ride OTP</p>
-          <p className="text-3xl tracking-widest">{otp}</p>
-          <p className="text-sm text-gray-600">
-            Share this OTP with driver
-          </p>
+          <p className="text-3xl">{otp}</p>
         </div>
       )}
 
-      {/* MAP */}
       <MapView driverLocation={driverLocation} />
-
-      {/* LIVE FARE */}
       {fare && <LiveFare fare={fare} />}
-
-      {/* CHAT */}
       <ChatBox rideId={rideId} userId="client" />
 
-      {/* ACTIONS */}
       <div className="flex gap-3">
         <CallButton phone="7896541230" />
         <SOSButton rideId={rideId} />
       </div>
+
+      {/* ⭐ RATING POPUP */}
+      {showRating && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-xl w-full max-w-sm">
+            <h3 className="text-lg font-bold mb-3">Rate your Driver</h3>
+
+            <select
+              value={rating}
+              onChange={(e) => setRating(Number(e.target.value))}
+              className="w-full border p-2 rounded mb-3"
+            >
+              {[5, 4, 3, 2, 1].map((r) => (
+                <option key={r} value={r}>
+                  {r} ⭐
+                </option>
+              ))}
+            </select>
+
+            <textarea
+              placeholder="Feedback (optional)"
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value)}
+              className="w-full border p-2 rounded mb-4"
+            />
+
+            <button
+              onClick={submitRating}
+              className="w-full bg-indigo-600 text-white py-2 rounded"
+            >
+              Submit Rating
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
