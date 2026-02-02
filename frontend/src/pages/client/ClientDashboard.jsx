@@ -12,56 +12,96 @@ export default function ClientDashboard() {
     getClientRides().then((res) => setRides(res.data.data));
   }, []);
 
-  if (!profile) return <div className="p-6">Loading...</div>;
+  if (!profile)
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#020617] text-gray-400">
+        Loading dashboard...
+      </div>
+    );
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <header className="bg-black text-white p-4 flex justify-between">
-        <h1 className="text-xl">
-          Dear, <span className="font-bold">{profile.name}</span>
+    <div className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#111827] to-[#020617]">
+      {/* HEADER */}
+      <header className="px-6 py-6">
+        <p className="text-sm text-gray-400">Welcome back</p>
+        <h1 className="text-2xl font-extrabold text-white">
+          {profile.name}
         </h1>
-        <button
-          onClick={() => {
-            localStorage.clear();
-            navigate("/");
-          }}
-          className="bg-red-500 px-3 py-1 rounded"
-        >
-          Logout
-        </button>
       </header>
 
-      {/* Navigation */}
-      <nav className="bg-white p-4 shadow flex gap-4">
-        <button className="border px-3 py-1 rounded">Dashboard</button>
-        <button
+      {/* ACTION CARDS */}
+      <section className="px-6 py-6 grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <ActionCard
+          title="Book a Driver"
+          subtitle="New Ride"
+          icon="🚗"
           onClick={() => navigate("/client/book")}
-          className="border px-3 py-1 rounded"
-        >
-          Book Ride
-        </button>
-        <button className="border px-3 py-1 rounded">Profile</button>
-        <button onClick={() => navigate("/client/history")}>
-  Ride History
-</button>
+        />
+        <ActionCard
+          title="Ride History"
+          subtitle="Past Trips"
+          icon="📜"
+          onClick={() => navigate("/client/history")}
+        />
+        <ActionCard
+          title="My Profile"
+          subtitle="Account"
+          icon="👤"
+          onClick={() => navigate("/client/profile")}
+        />
+      </section>
 
-      </nav>
+      {/* RECENT RIDES */}
+      <div className="px-6 pb-10">
+        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6">
+          <h2 className="text-lg font-bold text-white mb-4">
+            Recent Rides
+          </h2>
 
-      {/* Content */}
-      <main className="p-6">
-        <h2 className="text-lg font-bold mb-4">Ride History</h2>
-
-        {rides.length === 0 ? (
-          <p className="text-gray-500">No rides yet</p>
-        ) : (
-          <ul>
-            {rides.map((ride) => (
-              <li key={ride._id}>{ride._id}</li>
-            ))}
-          </ul>
-        )}
-      </main>
+          {rides.length === 0 ? (
+            <p className="text-gray-400">No rides yet</p>
+          ) : (
+            <ul className="space-y-3">
+              {rides.slice(0, 5).map((ride) => (
+                <li
+                  key={ride._id}
+                  className="flex justify-between items-center rounded-xl border border-white/10 p-3 text-gray-300"
+                >
+                  <span className="font-mono text-sm">
+                    {ride._id}
+                  </span>
+                  <button
+                    onClick={() =>
+                      navigate(`/client/live/${ride._id}`)
+                    }
+                    className="text-cyan-400 hover:underline text-sm"
+                  >
+                    View →
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
     </div>
+  );
+}
+
+/* ================= CARD ================= */
+
+function ActionCard({ title, subtitle, icon, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className="group relative rounded-3xl p-[1px] bg-gradient-to-r from-indigo-600/60 to-cyan-500/60"
+    >
+      <div className="rounded-3xl bg-[#020617] p-6 text-left shadow-xl group-hover:-translate-y-1 transition">
+        <p className="text-sm text-gray-400">{subtitle}</p>
+        <p className="text-xl font-bold text-white mt-1">
+          {icon} {title}
+        </p>
+      </div>
+    </button>
   );
 }

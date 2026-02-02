@@ -13,7 +13,7 @@ export const assignDriverToRide = async (ride) => {
 
   ride.driverId = driverStatus.driverId._id;
   ride.assignedAt = new Date();
-  ride.requestExpiresAt = new Date(Date.now() + 60 * 1000); // 1 minute
+  ride.requestExpiresAt = new Date(Date.now() + 60 * 1000);
   await ride.save();
 
   return ride;
@@ -21,73 +21,50 @@ export const assignDriverToRide = async (ride) => {
 
 export const markDriverArrived = async (req, res) => {
   const ride = await Ride.findById(req.params.rideId);
-
-  if (!ride) {
-    return res.status(404).json({ message: "Ride not found" });
-  }
-
-  if (ride.status !== "ACCEPTED") {
+  if (!ride) return res.status(404).json({ message: "Ride not found" });
+  if (ride.status !== "ACCEPTED")
     return res.status(400).json({ message: "Invalid state" });
-  }
 
   ride.status = "DRIVER_ARRIVED";
   await ride.save();
 
   const io = getIO();
-
   io.to(ride._id.toString()).emit("ride_status_update", {
     status: "DRIVER_ARRIVED",
   });
 
-  res.json({
-    success: true,
-    message: "Driver arrived at pickup",
-  });
+  res.json({ success: true, message: "Driver arrived at pickup" });
 };
-
-
-
 
 export const verifyRideOTP = async (req, res) => {
   const { otp } = req.body;
   const ride = await Ride.findById(req.params.rideId);
 
-  if (!ride) {
-    return res.status(404).json({ message: "Ride not found" });
-  }
-
-  if (ride.status !== "DRIVER_ARRIVED") {
+  if (!ride) return res.status(404).json({ message: "Ride not found" });
+  if (ride.status !== "DRIVER_ARRIVED")
     return res.status(400).json({ message: "Driver not arrived yet" });
-  }
 
-if (ride.otp !== String(otp)) {
-  return res.status(400).json({ message: "Invalid OTP" });
-}
+  if (ride.otp !== String(otp))
+    return res.status(400).json({ message: "Invalid OTP" });
 
-ride.otpVerified = true;
-ride.status = "ON_RIDE";
-await ride.save();
+  ride.otpVerified = true;
+  ride.status = "ON_RIDE";
+  await ride.save();
 
-const io = getIO();
+  const io = getIO();
+  io.to(ride._id.toString()).emit("ride_status_update", {
+    status: "ON_RIDE",
+  });
 
-io.to(ride._id.toString()).emit("ride_status_update", {
-  status: "ON_RIDE",
-});
-
-res.json({
-  success: true,
-  message: "OTP verified. Ride started",
-});
-
+  res.json({ success: true, message: "OTP verified. Ride started" });
 };
 
 /**
- * CREATE RIDE
+ * CREATE RIDE  ✅ FIXED
  */
 export const createRide = async (req, res) => {
   const user = await User.findById(req.user._id);
 
-  // Block check
   if (user.blockedUntil && user.blockedUntil > new Date()) {
     return res.status(403).json({
       success: false,
@@ -104,16 +81,22 @@ export const createRide = async (req, res) => {
     status: "REQUESTED",
   });
 
-  // AFTER creating ride
-const assignedRide = await assignDriverToRide(ride);
+  // ✅ ONLY assign driver for PAY AFTER RIDE
+  let finalRide = ride;
 
-res.json({
-  success: true,
-  message: assignedRide
-    ? "Ride requested & driver notified"
-    : "Ride requested, waiting for driver",
-  data: assignedRide || ride,
-});
+  if (req.body.paymentMode === "pay_after_ride") {
+    const assignedRide = await assignDriverToRide(ride);
+    finalRide = assignedRide || ride;
+  }
+
+  res.json({
+    success: true,
+    message:
+      req.body.paymentMode === "pay_now"
+        ? "Ride created, awaiting payment"
+        : "Ride requested & driver notified",
+    data: finalRide,
+  });
 };
 
 /**
@@ -122,9 +105,7 @@ res.json({
 export const cancelRideByClient = async (req, res) => {
   const ride = await Ride.findById(req.params.rideId);
 
-  if (!ride)
-    return res.status(404).json({ message: "Ride not found" });
-
+  if (!ride) return res.status(404).json({ message: "Ride not found" });
   if (ride.clientId.toString() !== req.user._id.toString())
     return res.status(403).json({ message: "Unauthorized" });
 
@@ -132,15 +113,12 @@ export const cancelRideByClient = async (req, res) => {
     (new Date() - new Date(ride.createdAt)) / (1000 * 60);
 
   if (diffMinutes > 5)
-    return res
-      .status(400)
-      .json({ message: "Cancellation window expired" });
+    return res.status(400).json({ message: "Cancellation window expired" });
 
   ride.status = "CANCELLED_BY_CLIENT";
   ride.cancelledAt = new Date();
   await ride.save();
 
-  // Update cancellation count
   const user = await User.findById(req.user._id);
   user.cancelCountToday += 1;
 
@@ -150,10 +128,7 @@ export const cancelRideByClient = async (req, res) => {
 
   await user.save();
 
-  res.json({
-    success: true,
-    message: "Ride cancelled successfully",
-  });
+  res.json({ success: true, message: "Ride cancelled successfully" });
 };
 
 

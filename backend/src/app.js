@@ -38,7 +38,7 @@ app.use("/rides", rideRoutes);
 app.use("/kyc", kycRoutes);
 app.use("/driver", driverRoutes);
 app.use("/waiting", waitingRoutes);
-app.use("/payment", paymentRoutes);
+app.use("/payments", paymentRoutes);
 app.use("/rides", rideCompletionRoutes);
 app.use("/history", historyRoutes);
 app.use("/chat", chatRoutes);

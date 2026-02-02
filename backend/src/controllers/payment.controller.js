@@ -2,6 +2,7 @@ import razorpay from "../config/razorpay.js";
 import crypto from "crypto";
 import Payment from "../models/Payment.model.js";
 import Ride from "../models/Ride.model.js";
+import { assignDriverToRide } from "./ride.controller.js"; // ✅ ADD
 
 /**
  * Create Online Payment Order
@@ -34,7 +35,7 @@ export const createPaymentOrder = async (req, res) => {
 };
 
 /**
- * Verify Online Payment
+ * Verify Online Payment ✅ FIXED
  */
 export const verifyPayment = async (req, res) => {
   const {
@@ -48,7 +49,7 @@ export const verifyPayment = async (req, res) => {
 
   const expectedSignature = crypto
     .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-    .update(body.toString())
+    .update(body)
     .digest("hex");
 
   if (expectedSignature !== razorpay_signature) {
@@ -64,22 +65,22 @@ export const verifyPayment = async (req, res) => {
   payment.status = "PAID";
   await payment.save();
 
-  await Ride.findByIdAndUpdate(payment.rideId, {
-    status: "PAID",
-  });
+  const ride = await Ride.findById(payment.rideId);
+
+  // ✅ NOW ASSIGN DRIVER AFTER PAYMENT
+  await assignDriverToRide(ride);
 
   res.json({
     success: true,
-    message: "Payment verified & completed",
+    message: "Payment verified & driver notified",
   });
 };
 
 /**
- * Pay After Ride (Driver confirms)
+ * Pay After Ride
  */
 export const confirmOfflinePayment = async (req, res) => {
   const { rideId } = req.body;
-
   const ride = await Ride.findById(rideId);
 
   await Payment.create({
@@ -92,8 +93,5 @@ export const confirmOfflinePayment = async (req, res) => {
   ride.status = "PAID";
   await ride.save();
 
-  res.json({
-    success: true,
-    message: "Offline payment confirmed",
-  });
+  res.json({ success: true, message: "Offline payment confirmed" });
 };

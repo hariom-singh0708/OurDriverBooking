@@ -19,12 +19,8 @@ export default function DriverLiveRide() {
 
   const token = localStorage.getItem("token");
 
-<<<<<<< HEAD
   
-  /* ================= LOCATION STREAM ================= */
-=======
   /* ================= FETCH ACTIVE RIDE ================= */
->>>>>>> f8a84d6eedf7e5fd1331777b1752adc3ac9d539b
   useEffect(() => {
     axios
       .get("http://localhost:5000/rides/driver/active", {
