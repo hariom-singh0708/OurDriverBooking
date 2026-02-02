@@ -147,6 +147,7 @@ export default function AppRoutes() {
 
 <Route
   path="/driver/live/:rideId"
+  
   element={<DriverLiveRide />}
 />
 
@@ -154,7 +155,9 @@ export default function AppRoutes() {
 <Route
   path="/client/history"
   element={
+
     <ProtectedRoute>
+      <AppNavbar />
       <ClientHistory />
     </ProtectedRoute>
   }
@@ -164,6 +167,7 @@ export default function AppRoutes() {
   path="/driver/history"
   element={
     <ProtectedRoute>
+      <AppNavbar />
       <DriverHistory />
     </ProtectedRoute>
   }
