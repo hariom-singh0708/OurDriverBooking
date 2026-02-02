@@ -21,21 +21,21 @@ API.interceptors.request.use(
 
 /* ================== DRIVER APIs ================== */
 
-// ONLINE / OFFLINE
 export const toggleDriverStatus = (data) =>
   API.post("/toggle-status", data);
 
-// GET DRIVER STATUS (FOR REFRESH FIX)
 export const getDriverStatus = () =>
   API.get("/status");
 
-// RIDE REQUEST
 export const getRideRequest = () =>
   API.get("/ride-request");
 
-// ACCEPT / REJECT
 export const acceptRide = (rideId) =>
   API.put(`/ride/${rideId}/accept`);
 
 export const rejectRide = (rideId) =>
   API.put(`/ride/${rideId}/reject`);
+
+/* ✅ FIXED */
+export const getDriverAnalytics = (type) =>
+  API.get(`/analytics?type=${type}`);

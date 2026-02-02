@@ -45,15 +45,22 @@ export default function DriverRideStart({ ride }) {
   };
 
   return (
-    <div className="border p-4 space-y-4 bg-white rounded">
-      <h2 className="font-bold text-lg">Pickup Location Reached</h2>
+    <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-5 text-gray-200">
+      <h2 className="font-semibold text-lg flex items-center gap-2">
+        📍 Pickup Location Reached
+      </h2>
 
       {/* MARK ARRIVED BUTTON */}
       {!arrived && (
         <button
           disabled={loading}
           onClick={handleArrived}
-          className="bg-blue-600 text-white px-4 py-2 rounded"
+          className={`w-full py-2 rounded-lg font-semibold transition
+            ${
+              loading
+                ? "bg-gray-700 cursor-not-allowed"
+                : "bg-blue-600 hover:bg-blue-700"
+            }`}
         >
           {loading ? "Marking..." : "Mark Arrived"}
         </button>
@@ -62,7 +69,7 @@ export default function DriverRideStart({ ride }) {
       {/* OTP BOX */}
       {arrived && (
         <div className="space-y-2">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-400">
             Enter OTP from client to start ride
           </p>
           <OTPBox onSubmit={handleOTPSubmit} />
@@ -70,7 +77,9 @@ export default function DriverRideStart({ ride }) {
       )}
 
       {/* 💬 CHAT BOX */}
-      <ChatBox rideId={ride._id} userId="driver" />
+      <div className="pt-3 border-t border-gray-800">
+        <ChatBox rideId={ride._id} userId="driver" />
+      </div>
     </div>
   );
 }

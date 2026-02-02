@@ -4,44 +4,48 @@ import axios from "axios";
 
 import { SocketContext } from "../../context/SocketContext";
 
-import DriverWaiting from "./DriverWaiting";
 import ChatBox from "../../components/ChatBox";
 import SOSButton from "../../components/SOSButton";
 import CompleteRideButton from "../../components/CompleteRideButton";
+import qrImage from "../../assets/qr.jpeg";
 
 export default function DriverLiveRide() {
   const navigate = useNavigate();
   const { socket } = useContext(SocketContext);
 
   const [ride, setRide] = useState(null);
-  const [sendingLocation, setSendingLocation] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [sendingLocation, setSendingLocation] = useState(false);
+const [paymentMethod, setPaymentMethod] = useState("UPI");
 
   const token = localStorage.getItem("token");
 
-  
   /* ================= FETCH ACTIVE RIDE ================= */
   useEffect(() => {
-    axios
-      .get("http://localhost:5000/rides/driver/active", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      .then((res) => {
+    const fetchRide = async () => {
+      try {
+        const res = await axios.get(
+          "http://localhost:5000/rides/driver/active",
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
         setRide(res.data.data);
+      } catch {
+        setRide(null);
+      } finally {
         setLoading(false);
-      })
-      .catch(() => {
-        setLoading(false);
-      });
+      }
+    };
+
+    fetchRide();
   }, []);
 
-  /* ================= JOIN RIDE SOCKET ================= */
+  /* ================= SOCKET JOIN ================= */
   useEffect(() => {
     if (!socket || !ride?._id) return;
     socket.emit("join_ride", ride._id);
   }, [socket, ride]);
 
-  /* ================= LIVE LOCATION STREAM ================= */
+  /* ================= LIVE LOCATION ================= */
   useEffect(() => {
     if (!ride?._id) return;
 
@@ -55,9 +59,7 @@ export default function DriverLiveRide() {
           lat: 28.6 + Math.random() / 100,
           lng: 77.2 + Math.random() / 100,
         },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
     }, 3000);
 
@@ -67,112 +69,183 @@ export default function DriverLiveRide() {
     };
   }, [ride]);
 
-  /* ================= SOCKET LISTENERS ================= */
+  /* ================= SOCKET EVENTS ================= */
   useEffect(() => {
     if (!socket) return;
 
     socket.on("payment_received", () => {
-      setRide((prev) => ({
-        ...prev,
-        paymentStatus: "PAID",
-      }));
+      setRide((prev) =>
+        prev ? { ...prev, paymentStatus: "PAID" } : prev
+      );
     });
 
-    socket.on("sos_triggered", () => {
-      alert("🚨 SOS ALERT RECEIVED!");
+    socket.on("ride_status_update", ({ status }) => {
+      setRide((prev) =>
+        prev ? { ...prev, status } : prev
+      );
     });
 
     return () => {
       socket.off("payment_received");
-      socket.off("sos_triggered");
+      socket.off("ride_status_update");
     };
   }, [socket]);
 
-  /* ================= PAYMENT HANDLER ================= */
+  /* ================= PAYMENT ================= */
   const markPaymentReceived = async () => {
+  await axios.post(
+    `http://localhost:5000/rides/${ride._id}/payment-received`,
+    { method: paymentMethod },
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+
+  setRide((prev) => ({
+    ...prev,
+    paymentStatus: "PAID",
+    paymentMethod,
+  }));
+};
+
+
+  /* ================= COMPLETE RIDE ================= */
+ const completeRide = async () => {
+  try {
     await axios.post(
-      `http://localhost:5000/rides/${ride._id}/payment-received`,
+      `http://localhost:5000/rides/${ride._id}/complete`,
       {},
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
+      { headers: { Authorization: `Bearer ${token}` } }
     );
 
-    setRide((prev) => ({
-      ...prev,
-      paymentStatus: "PAID",
-    }));
-  };
+    navigate("/driver"); // ✅ instant redirect
+  } catch (err) {
+    alert(
+      err.response?.data?.message ||
+      "Failed to complete ride"
+    );
+  }
+};
+
 
   /* ================= UI STATES ================= */
   if (loading) {
-    return <p className="p-6">Loading ride...</p>;
+    return (
+      <div className="min-h-screen bg-gray-900 text-gray-400 p-6">
+        Loading ride...
+      </div>
+    );
   }
 
   if (!ride) {
-    return <p className="p-6">No active ride</p>;
+    return (
+      <div className="min-h-screen bg-gray-900 text-gray-400 p-6">
+        No active ride
+      </div>
+    );
   }
 
-  return (
-    <div className="p-6 space-y-4 bg-gray-100 min-h-screen">
-      <h2 className="text-xl font-bold">Ride in Progress</h2>
+  const paymentStatus = ride.paymentStatus;
+  const paymentMode = ride.paymentMode;
 
-      {/* LIVE LOCATION STATUS */}
-      <div className="bg-white p-3 rounded">
-        <p>
-          Live Location:
-          <span className="ml-2 text-green-600">
-            {sendingLocation ? "Sending" : "Stopped"}
-          </span>
-        </p>
+  const isPaymentRequired =
+    paymentMode === "pay_after_ride" &&
+    paymentStatus !== "PAID";
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-gray-200 p-6 space-y-5">
+      <h2 className="text-2xl font-bold">🚗 Live Ride</h2>
+
+      {/* LOCATION */}
+      <div className="bg-gray-800 p-4 rounded flex justify-between">
+        <span>Live Location</span>
+        <span
+          className={`font-semibold ${
+            sendingLocation ? "text-green-400" : "text-red-400"
+          }`}
+        >
+          {sendingLocation ? "Sending" : "Stopped"}
+        </span>
       </div>
 
-      {/* WAITING TIME */}
-      <DriverWaiting rideId={ride._id} />
-
       {/* TRIP DETAILS */}
-      <div className="bg-white p-4 rounded space-y-2">
-        <h3 className="font-semibold text-lg">Trip Details</h3>
+      <div className="bg-gray-800 p-4 rounded space-y-3">
+        <h3 className="text-lg font-semibold">Trip Details</h3>
 
         <p><b>Pickup:</b> {ride.pickupLocation.address}</p>
         <p><b>Drop:</b> {ride.dropLocation.address}</p>
         <p><b>Ride Type:</b> {ride.rideType}</p>
 
-        <p className="font-semibold mt-2">
-          Total Fare: ₹{ride.fareBreakdown.totalFare}
+        <p className="text-xl font-bold">
+          ₹{ride.fareBreakdown.totalFare}
         </p>
 
-        {ride.paymentStatus === "PAID" ? (
-          <span className="inline-block px-3 py-1 bg-green-100 text-green-700 rounded text-sm">
-            Paid
-          </span>
-        ) : (
-          ride.paymentMode === "pay_after_ride" && (
-            <div className="space-y-2">
-              <span className="inline-block px-3 py-1 bg-red-100 text-red-700 rounded text-sm">
-                Unpaid
+        {/* PAYMENT STATUS */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-400">
+              Payment Status:
+            </span>
+
+            {paymentStatus === "PAID" ? (
+              <span className="px-3 py-1 bg-green-900 text-green-300 rounded text-sm font-semibold">
+                PAID
               </span>
+            ) : (
+              <span className="px-3 py-1 bg-red-900 text-red-300 rounded text-sm font-semibold">
+                UNPAID
+              </span>
+            )}
+          </div>
 
-              <div className="border p-3 rounded text-center">
-                <p className="text-sm mb-2">
-                  Show this QR to client
-                </p>
-                <img
-                  src="/upi-qr.png"
-                  alt="Payment QR"
-                  className="mx-auto w-40"
-                />
-              </div>
+          {/* QR + MARK PAYMENT */}
+          {paymentMode === "pay_after_ride" &&
+ paymentStatus === "UNPAID" && (
+  <div className="space-y-4">
 
-              <button
-                onClick={markPaymentReceived}
-                className="w-full bg-green-600 text-white py-2 rounded"
-              >
-                Mark Payment Received
-              </button>
-            </div>
-          )
-        )}
+    {/* PAYMENT METHOD SELECT */}
+    <div className="flex gap-3">
+      <button
+        onClick={() => setPaymentMethod("UPI")}
+        className={`flex-1 py-2 rounded ${
+          paymentMethod === "UPI"
+            ? "bg-blue-600"
+            : "bg-gray-700"
+        }`}
+      >
+        UPI / QR
+      </button>
+
+      <button
+        onClick={() => setPaymentMethod("CASH")}
+        className={`flex-1 py-2 rounded ${
+          paymentMethod === "CASH"
+            ? "bg-yellow-600"
+            : "bg-gray-700"
+        }`}
+      >
+        Cash
+      </button>
+    </div>
+
+    {/* QR ONLY FOR UPI */}
+    {paymentMethod === "UPI" && (
+      <div className="border border-gray-700 p-3 rounded text-center">
+        <p className="text-sm mb-2 text-gray-400">
+          Show this QR to customer
+        </p>
+        <img src={qrImage} alt="UPI QR" className="mx-auto w-40" />
+      </div>
+    )}
+
+    <button
+      onClick={markPaymentReceived}
+      className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded"
+    >
+      Mark Payment Received
+    </button>
+  </div>
+)}
+
+        </div>
       </div>
 
       {/* CHAT */}
@@ -184,10 +257,9 @@ export default function DriverLiveRide() {
 
         <CompleteRideButton
           rideId={ride._id}
-          disabled={ride.paymentStatus !== "PAID"}
-          onComplete={() => navigate("/driver")}
+          disabled={isPaymentRequired}
+          onComplete={completeRide}
         />
-
       </div>
     </div>
   );

@@ -35,8 +35,8 @@ export default function AppRoutes() {
   return (
     <Routes>
       {/* ================= AUTH ================= */}
-      <Route path="/" element={<Login />} />
-      <Route path="/home" element={<HomePage />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/" element={<HomePage />} />
       <Route path="/admin/payouts/history" element={<PayoutHistory />} />
 
       <Route path="/admin/dashboard" element={<AdminDashboard />} />
