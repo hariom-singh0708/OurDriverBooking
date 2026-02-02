@@ -60,6 +60,17 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/client/profile"
+        element={
+          <ProtectedRoute>
+            <>
+              <AppNavbar />
+              <ClientProfile />
+            </>
+          </ProtectedRoute>
+        }
+      />
 
       <Route
         path="/client/book"
@@ -68,6 +79,30 @@ export default function AppRoutes() {
             <>
               <AppNavbar />
               <BookRide />
+            </>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/driver"
+        element={
+          <ProtectedRoute>
+            <>
+              <AppNavbar />
+              <DriverDashboard />
+            </>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/driver/profile"
+        element={
+          <ProtectedRoute>
+            <>
+              <AppNavbar />
+              <DriverProfile />
             </>
           </ProtectedRoute>
         }
