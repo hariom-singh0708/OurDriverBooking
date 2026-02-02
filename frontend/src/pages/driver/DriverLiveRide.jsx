@@ -16,7 +16,7 @@ export default function DriverLiveRide() {
   const [ride, setRide] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sendingLocation, setSendingLocation] = useState(false);
-const [paymentMethod, setPaymentMethod] = useState("UPI");
+  const [paymentMethod, setPaymentMethod] = useState("UPI");
 
   const token = localStorage.getItem("token");
 
@@ -93,37 +93,37 @@ const [paymentMethod, setPaymentMethod] = useState("UPI");
 
   /* ================= PAYMENT ================= */
   const markPaymentReceived = async () => {
-  await axios.post(
-    `http://localhost:5000/rides/${ride._id}/payment-received`,
-    { method: paymentMethod },
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
-
-  setRide((prev) => ({
-    ...prev,
-    paymentStatus: "PAID",
-    paymentMethod,
-  }));
-};
-
-
-  /* ================= COMPLETE RIDE ================= */
- const completeRide = async () => {
-  try {
     await axios.post(
-      `http://localhost:5000/rides/${ride._id}/complete`,
-      {},
+      `http://localhost:5000/rides/${ride._id}/payment-received`,
+      { method: paymentMethod },
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
-    navigate("/driver"); // ✅ instant redirect
-  } catch (err) {
-    alert(
-      err.response?.data?.message ||
-      "Failed to complete ride"
-    );
-  }
-};
+    setRide((prev) => ({
+      ...prev,
+      paymentStatus: "PAID",
+      paymentMethod,
+    }));
+  };
+
+
+  /* ================= COMPLETE RIDE ================= */
+  const completeRide = async () => {
+    try {
+      await axios.post(
+        `http://localhost:5000/rides/${ride._id}/complete`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      navigate("/driver"); // ✅ instant redirect
+    } catch (err) {
+      alert(
+        err.response?.data?.message ||
+        "Failed to complete ride"
+      );
+    }
+  };
 
 
   /* ================= UI STATES ================= */
@@ -158,9 +158,8 @@ const [paymentMethod, setPaymentMethod] = useState("UPI");
       <div className="bg-gray-800 p-4 rounded flex justify-between">
         <span>Live Location</span>
         <span
-          className={`font-semibold ${
-            sendingLocation ? "text-green-400" : "text-red-400"
-          }`}
+          className={`font-semibold ${sendingLocation ? "text-green-400" : "text-red-400"
+            }`}
         >
           {sendingLocation ? "Sending" : "Stopped"}
         </span>
@@ -198,52 +197,50 @@ const [paymentMethod, setPaymentMethod] = useState("UPI");
 
           {/* QR + MARK PAYMENT */}
           {paymentMode === "pay_after_ride" &&
- paymentStatus === "UNPAID" && (
-  <div className="space-y-4">
+            paymentStatus === "UNPAID" && (
+              <div className="space-y-4">
 
-    {/* PAYMENT METHOD SELECT */}
-    <div className="flex gap-3">
-      <button
-        onClick={() => setPaymentMethod("UPI")}
-        className={`flex-1 py-2 rounded ${
-          paymentMethod === "UPI"
-            ? "bg-blue-600"
-            : "bg-gray-700"
-        }`}
-      >
-        UPI / QR
-      </button>
+                {/* PAYMENT METHOD SELECT */}
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setPaymentMethod("UPI")}
+                    className={`flex-1 py-2 rounded ${paymentMethod === "UPI"
+                        ? "bg-blue-600"
+                        : "bg-gray-700"
+                      }`}
+                  >
+                    UPI / QR
+                  </button>
 
-      <button
-        onClick={() => setPaymentMethod("CASH")}
-        className={`flex-1 py-2 rounded ${
-          paymentMethod === "CASH"
-            ? "bg-yellow-600"
-            : "bg-gray-700"
-        }`}
-      >
-        Cash
-      </button>
-    </div>
+                  <button
+                    onClick={() => setPaymentMethod("CASH")}
+                    className={`flex-1 py-2 rounded ${paymentMethod === "CASH"
+                        ? "bg-yellow-600"
+                        : "bg-gray-700"
+                      }`}
+                  >
+                    Cash
+                  </button>
+                </div>
 
-    {/* QR ONLY FOR UPI */}
-    {paymentMethod === "UPI" && (
-      <div className="border border-gray-700 p-3 rounded text-center">
-        <p className="text-sm mb-2 text-gray-400">
-          Show this QR to customer
-        </p>
-        <img src={qrImage} alt="UPI QR" className="mx-auto w-40" />
-      </div>
-    )}
+                {/* QR ONLY FOR UPI */}
+                {paymentMethod === "UPI" && (
+                  <div className="border border-gray-700 p-3 rounded text-center">
+                    <p className="text-sm mb-2 text-gray-400">
+                      Show this QR to customer
+                    </p>
+                    <img src={qrImage} alt="UPI QR" className="mx-auto w-40" />
+                  </div>
+                )}
 
-    <button
-      onClick={markPaymentReceived}
-      className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded"
-    >
-      Mark Payment Received
-    </button>
-  </div>
-)}
+                <button
+                  onClick={markPaymentReceived}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded"
+                >
+                  Mark Payment Received
+                </button>
+              </div>
+            )}
 
         </div>
       </div>
