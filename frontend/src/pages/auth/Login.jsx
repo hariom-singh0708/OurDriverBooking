@@ -23,9 +23,12 @@ export default function Login() {
 
   const redirectUser = (res) => {
     login(res.data.data.token, res.data.data.role);
-    res.data.data.role === "client"
-      ? navigate("/client")
-      : navigate("/driver");
+    if(res.data.data.role === "client")
+     navigate("/client")
+    else if(res.data.data.role === "driver")
+       navigate("/driver");
+      else if(res.data.data.role === "admin")
+        navigate("/admin/dashboard");
   };
 
   const handlePasswordLogin = async (e) => {

@@ -22,7 +22,8 @@ const statusClass = (status) => {
   if (s === "COMPLETED") return "bg-green-50 text-green-700 border-green-200";
   if (s.includes("CANCEL")) return "bg-red-50 text-red-700 border-red-200";
   if (s === "ON_RIDE") return "bg-indigo-50 text-indigo-700 border-indigo-200";
-  if (s === "DRIVER_ARRIVED") return "bg-purple-50 text-purple-700 border-purple-200";
+  if (s === "DRIVER_ARRIVED")
+    return "bg-purple-50 text-purple-700 border-purple-200";
   if (s === "ACCEPTED") return "bg-blue-50 text-blue-700 border-blue-200";
   if (s === "REQUESTED") return "bg-gray-50 text-gray-700 border-gray-200";
   return "bg-gray-50 text-gray-700 border-gray-200";
@@ -74,14 +75,23 @@ export default function AdminDashboard() {
       setStats(s?.data || s);
       setRides(r?.data || []);
     } catch (e) {
-      console.log("ADMIN DASH ERROR:", e?.response?.status, e?.response?.data, e?.message);
-      setErr(e?.response?.data?.message || e?.message || "Something went wrong");
+      console.log(
+        "ADMIN DASH ERROR:",
+        e?.response?.status,
+        e?.response?.data,
+        e?.message,
+      );
+      setErr(
+        e?.response?.data?.message || e?.message || "Something went wrong",
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => {
+    refresh();
+  }, []);
 
   if (loading) {
     return (
@@ -114,7 +124,9 @@ export default function AdminDashboard() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-extrabold text-gray-900">Admin Dashboard</h1>
+          <h1 className="text-2xl font-extrabold text-gray-900">
+            Admin Dashboard
+          </h1>
           <p className="text-sm text-gray-500 mt-1">
             Overview of rides and activity
           </p>
@@ -134,7 +146,9 @@ export default function AdminDashboard() {
         <StatCard label="Active Rides" value={stats?.activeRides} />
         <StatCard label="Completed Today" value={stats?.completedToday} />
         <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-          <div className="text-xs font-semibold text-gray-500">Active Ratio</div>
+          <div className="text-xs font-semibold text-gray-500">
+            Active Ratio
+          </div>
           <div className="mt-2 flex items-center gap-3">
             <div className="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden">
               <div
@@ -151,8 +165,12 @@ export default function AdminDashboard() {
       <div className="bg-white border border-gray-200 rounded-2xl shadow-sm">
         <div className="p-4 border-b border-gray-200 flex items-center justify-between">
           <div>
-            <div className="text-lg font-extrabold text-gray-900">Recent Rides</div>
-            <div className="text-xs text-gray-500 mt-1">Latest 10 ride requests</div>
+            <div className="text-lg font-extrabold text-gray-900">
+              Recent Rides
+            </div>
+            <div className="text-xs text-gray-500 mt-1">
+              Latest 10 ride requests
+            </div>
           </div>
 
           <Pill className="bg-gray-50 text-gray-700 border-gray-200">
@@ -209,7 +227,10 @@ export default function AdminDashboard() {
 
               {!rides.length && (
                 <tr>
-                  <td colSpan={5} className="py-10 px-4 text-center text-gray-500">
+                  <td
+                    colSpan={5}
+                    className="py-10 px-4 text-center text-gray-500"
+                  >
                     No rides found
                   </td>
                 </tr>
@@ -232,10 +253,9 @@ export default function AdminDashboard() {
           href="/admin/rides"
         />
         <QuickAction
-          title="Support"
+          title="Support | SOS"
           desc="Handle SOS / feedback (if enabled)."
-          href="/admin/support"
-          disabled
+          href="/admin/sos"
         />
       </div>
     </div>
@@ -243,18 +263,17 @@ export default function AdminDashboard() {
 }
 
 function QuickAction({ title, desc, href, disabled }) {
+  const classes = disabled
+    ? "bg-white border border-gray-200 rounded-2xl p-4 shadow-sm block opacity-50 cursor-not-allowed pointer-events-none"
+    : "bg-white border border-gray-200 rounded-2xl p-4 shadow-sm block hover:border-gray-300";
+
   return (
-    <a
-      href={disabled ? undefined : href}
-      className={`bg-white border border-gray-200 rounded-2xl p-4 shadow-sm block ${
-        disabled ? "opacity-50 cursor-not-allowed" : "hover:border-gray-300"
-      }`}
-      onClick={(e) => disabled && e.preventDefault()}
-    >
+    <a href={disabled ? undefined : href} className={classes}>
       <div className="font-extrabold text-gray-900">{title}</div>
       <div className="text-sm text-gray-500 mt-1">{desc}</div>
+
       <div className="mt-3 text-sm font-semibold text-black">
-        {disabled ? "Coming soon" : "Open →"}
+        Open
       </div>
     </a>
   );

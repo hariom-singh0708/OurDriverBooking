@@ -19,20 +19,21 @@ import AdminDrivers from "../pages/admin/Drivers";
 import AdminRides from "../pages/admin/Rides";
 import AdminDashboard from "../pages/admin/Dashboard";
 import AdminSOS from "../pages/admin/SOS";
+import WeeklyPayouts from "../pages/admin/WeeklyPayouts";
+import PayoutHistory from "../pages/admin/PayoutHistory";
 
 export default function AppRoutes() {
   return (
     <Routes>
-      <Route path="/home" element={<HomePage />} />
       <Route path="/" element={<Login />} />
+      <Route path="/home" element={<HomePage />} />
+      <Route path="/admin/payouts/history" element={<PayoutHistory />} />
+
       <Route path="/admin/dashboard" element={<AdminDashboard />} />
       <Route path="/admin/drivers" element={<AdminDrivers />} />
       <Route path="/admin/rides" element={<AdminRides />} />
-<Route path="/admin/sos" element={
-    <AdminSOS />
-} />
-
-
+      <Route path="/admin/sos" element={<AdminSOS />} />
+      <Route path="/admin/payouts" element={<WeeklyPayouts />} />
 
       <Route path="/signup" element={<Signup />} />
       <Route path="/verify-otp" element={<VerifyOTP />} />
@@ -42,7 +43,7 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <ClientDashboard />
-           </ProtectedRoute>
+          </ProtectedRoute>
         }
       />
 
@@ -55,68 +56,54 @@ export default function AppRoutes() {
         }
       />
 
+      <Route
+        path="/fare-test"
+        element={
+          <ProtectedRoute>
+            <FareCalculator />
+          </ProtectedRoute>
+        }
+      />
 
-<Route
-  path="/fare-test"
-  element={
-    <ProtectedRoute>
-      <FareCalculator />
-    </ProtectedRoute>
-  }
-/>
+      <Route
+        path="/client/book"
+        element={
+          <ProtectedRoute>
+            <BookRide />
+          </ProtectedRoute>
+        }
+      />
 
+      <Route
+        path="/driver/kyc"
+        element={
+          <ProtectedRoute>
+            <KYC />
+          </ProtectedRoute>
+        }
+      />
 
-<Route
-  path="/client/book"
-  element={
-    <ProtectedRoute>
-      <BookRide />
-    </ProtectedRoute>
-  }
-/>
+      <Route path="/client/live/:rideId" element={<LiveRide />} />
 
+      <Route path="/driver/live/:rideId" element={<DriverLiveRide />} />
 
-<Route
-  path="/driver/kyc"
-  element={
-    <ProtectedRoute>
-      <KYC />
-    </ProtectedRoute>
-  }
-/>
+      <Route
+        path="/client/history"
+        element={
+          <ProtectedRoute>
+            <ClientHistory />
+          </ProtectedRoute>
+        }
+      />
 
-
-
-<Route
-  path="/client/live/:rideId"
-  element={<LiveRide />}
-/>
-
-<Route
-  path="/driver/live/:rideId"
-  element={<DriverLiveRide />}
-/>
-
-
-<Route
-  path="/client/history"
-  element={
-    <ProtectedRoute>
-      <ClientHistory />
-    </ProtectedRoute>
-  }
-/>
-
-<Route
-  path="/driver/history"
-  element={
-    <ProtectedRoute>
-      <DriverHistory />
-    </ProtectedRoute>
-  }
-/>
-
-
+      <Route
+        path="/driver/history"
+        element={
+          <ProtectedRoute>
+            <DriverHistory />
+          </ProtectedRoute>
+        }
+      />
 
       <Route path="*" element={<NotFound />} />
     </Routes>
