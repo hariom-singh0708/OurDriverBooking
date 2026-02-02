@@ -75,37 +75,51 @@ const rideSchema = new mongoose.Schema(
     },
 
     completedAt: {
-  type: Date,
-},
+      type: Date,
+    },
 
-finalFareLocked: {
-  type: Boolean,
-  default: false,
-},
+    finalFareLocked: {
+      type: Boolean,
+      default: false,
+    },
 
 
 
     status: {
+      type: String,
+      enum: [
+        "REQUESTED",
+        "ACCEPTED",
+        "DRIVER_ARRIVED",   // ✅ ADD THIS
+        "ON_RIDE",
+        "COMPLETED",
+        "CANCELLED_BY_CLIENT",
+        "CANCELLED_BY_DRIVER"
+      ],
+      default: "REQUESTED"
+    },
+
+    
+
+    paymentStatus: {
+      type: String,
+      enum: ["UNPAID", "PAID"],
+      default: "UNPAID",
+    },
+
+    paymentMethod: {
   type: String,
-  enum: [
-    "REQUESTED",
-    "ACCEPTED",
-    "DRIVER_ARRIVED",   // ✅ ADD THIS
-    "ON_RIDE",
-    "COMPLETED",
-    "CANCELLED_BY_CLIENT",
-    "CANCELLED_BY_DRIVER"
-  ],
-  default: "REQUESTED"
+  enum: ["UPI", "CASH"],
 },
 
-paymentStatus: {
-  type: String,
-  enum: ["UNPAID", "PAID"],
-  default: "UNPAID",
-},
 
-paymentReceivedAt: Date,
+    paymentReceivedAt: Date,
+rejectedByDrivers: [
+  {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+  },
+],
 
 
 
