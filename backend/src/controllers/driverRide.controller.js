@@ -66,13 +66,23 @@ export const acceptRide = async (req, res) => {
 export const rejectRide = async (req, res) => {
   const ride = await Ride.findById(req.params.rideId);
 
-  ride.driverId = null;
-  ride.assignedAt = null;
-  ride.requestExpiresAt = null;
-  await ride.save();
+  if (!ride) {
+    return res.status(404).json({ message: "Ride not found" });
+  }
+
+  // 🔥 track rejection
+  await Ride.findByIdAndUpdate(ride._id, {
+    $addToSet: { rejectedByDrivers: req.user._id }, // ✅ analytics ke liye
+    $unset: {
+      driverId: "",
+      assignedAt: "",
+      requestExpiresAt: "",
+    },
+  });
 
   res.json({
     success: true,
     message: "Ride rejected",
   });
 };
+

@@ -136,7 +136,7 @@ export const cancelRideByClient = async (req, res) => {
 export const getDriverActiveRide = async (req, res) => {
   const ride = await Ride.findOne({
     driverId: req.user._id,
-    status: { $in: ["ON_RIDE", "DRIVER_ARRIVED"] },
+    status: { $in: ["ACCEPTED", "DRIVER_ARRIVED", "ON_RIDE"] },
   });
 
   if (!ride) {
@@ -154,27 +154,51 @@ export const getDriverActiveRide = async (req, res) => {
 
 
 export const markPaymentReceived = async (req, res) => {
+  const { method } = req.body; // "UPI" | "CASH"
+
   const ride = await Ride.findOne({
     _id: req.params.rideId,
     driverId: req.user._id,
   });
 
   if (!ride) {
-    return res.status(404).json({ message: "Ride not found" });
+    return res.status(404).json({
+      success: false,
+      message: "Ride not found",
+    });
+  }
+
+  if (ride.paymentStatus === "PAID") {
+    return res.status(400).json({
+      success: false,
+      message: "Payment already marked",
+    });
+  }
+
+  if (!["UPI", "CASH"].includes(method)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid payment method",
+    });
   }
 
   ride.paymentStatus = "PAID";
+  ride.paymentMethod = method;
   ride.paymentReceivedAt = new Date();
+
   await ride.save();
 
   const io = getIO();
-  io.to(ride._id.toString()).emit("payment_received");
+  io.to(ride._id.toString()).emit("payment_received", {
+    method,
+  });
 
   res.json({
     success: true,
-    message: "Payment marked as received",
+    message: `Payment received via ${method}`,
   });
 };
+
 
 
 

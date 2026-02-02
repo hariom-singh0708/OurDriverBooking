@@ -1,30 +1,16 @@
-import axios from "axios";
-
 export default function CompleteRideButton({
-  rideId,
   disabled,
   onComplete,
 }) {
-  const handleComplete = async () => {
-    if (disabled) return; // 🔒 HARD BLOCK
-
-    await axios.post(
-      `http://localhost:5000/rides/${rideId}/complete`,
-      {},
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      }
-    );
-
-    onComplete(); // 🔁 redirect
+  const handleClick = () => {
+    if (disabled) return;
+    onComplete(); // ✅ sirf parent ko notify
   };
 
   return (
     <button
       disabled={disabled}
-      onClick={handleComplete}
+      onClick={handleClick}
       className={`px-4 py-2 rounded text-white ${
         disabled
           ? "bg-gray-400 cursor-not-allowed"

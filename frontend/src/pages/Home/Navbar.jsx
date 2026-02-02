@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -17,15 +18,27 @@ export default function Navbar() {
           </nav>
         </div>
 
+        {/* Desktop buttons */}
         <div className="hidden md:flex items-center gap-4">
           <button className="text-sm text-white/90 hover:text-white">En</button>
           <button className="text-sm text-white/90 hover:text-white">Help</button>
-          <button className="text-sm text-white/90 hover:text-white">Login</button>
-          <button className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-white/90">
+
+          <Link
+            to="/login"
+            className="text-sm text-white/90 hover:text-white"
+          >
+            Login
+          </Link>
+
+          <Link
+            to="/signup"
+            className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-white/90"
+          >
             Sign up
-          </button>
+          </Link>
         </div>
 
+        {/* Mobile menu toggle */}
         <button
           className="md:hidden rounded-lg p-2 text-white/90 hover:bg-white/10"
           onClick={() => setMenuOpen((v) => !v)}
@@ -39,6 +52,7 @@ export default function Navbar() {
         </button>
       </div>
 
+      {/* Mobile menu */}
       {menuOpen && (
         <div className="md:hidden border-t border-white/10">
           <div className="mx-auto max-w-6xl px-4 py-3 text-white/90 space-y-2">
@@ -49,10 +63,22 @@ export default function Navbar() {
 
             <div className="pt-2 flex gap-3">
               <button className="text-sm hover:text-white">Help</button>
-              <button className="text-sm hover:text-white">Login</button>
-              <button className="ml-auto rounded-full bg-white px-4 py-2 text-sm font-semibold text-black">
+
+              <Link
+                to="/login"
+                className="text-sm hover:text-white"
+                onClick={() => setMenuOpen(false)}
+              >
+                Login
+              </Link>
+
+              <Link
+                to="/signup"
+                className="ml-auto rounded-full bg-white px-4 py-2 text-sm font-semibold text-black"
+                onClick={() => setMenuOpen(false)}
+              >
                 Sign up
-              </button>
+              </Link>
             </div>
           </div>
         </div>

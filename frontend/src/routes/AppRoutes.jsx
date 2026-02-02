@@ -37,9 +37,17 @@ export default function AppRoutes() {
   return (
     <Routes>
       {/* ================= AUTH ================= */}
-      <Route path="/" element={<Login />} />
-      <Route path="/home" element={<HomePage />} />
-       <Route path="/signup" element={<Signup />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/" element={<HomePage />} />
+      <Route path="/admin/payouts/history" element={<PayoutHistory />} />
+
+      <Route path="/admin/dashboard" element={<AdminDashboard />} />
+      <Route path="/admin/drivers" element={<AdminDrivers />} />
+      <Route path="/admin/rides" element={<AdminRides />} />
+      <Route path="/admin/sos" element={<AdminSOS />} />
+      <Route path="/admin/payouts" element={<WeeklyPayouts />} />
+
+      <Route path="/signup" element={<Signup />} />
       <Route path="/verify-otp" element={<VerifyOTP />} />
 
     <Route
@@ -161,6 +169,30 @@ export default function AppRoutes() {
         }
       />
 
+      <Route
+        path="/driver"
+        element={
+          <ProtectedRoute>
+            <>
+              <AppNavbar />
+              <DriverDashboard />
+            </>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/driver/profile"
+        element={
+          <ProtectedRoute>
+            <>
+              <AppNavbar />
+              <DriverProfile />
+            </>
+          </ProtectedRoute>
+        }
+      />
+
 
 <Route
   path="/fare-test"
@@ -200,6 +232,7 @@ export default function AppRoutes() {
 
 <Route
   path="/driver/live/:rideId"
+  
   element={<DriverLiveRide />}
 />
 
@@ -207,7 +240,9 @@ export default function AppRoutes() {
 <Route
   path="/client/history"
   element={
+
     <ProtectedRoute>
+      <AppNavbar />
       <ClientHistory />
     </ProtectedRoute>
   }
@@ -226,6 +261,7 @@ export default function AppRoutes() {
   path="/driver/history"
   element={
     <ProtectedRoute>
+      <AppNavbar />
       <DriverHistory />
     </ProtectedRoute>
   }

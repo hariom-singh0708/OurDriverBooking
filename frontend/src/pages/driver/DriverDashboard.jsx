@@ -6,34 +6,66 @@ import {
   getRideRequest,
   acceptRide,
   rejectRide,
+  getDriverStatus,
+  getDriverAnalytics,
 } from "../../services/driver.api";
 
 import { getKYCStatus } from "../../services/kyc.api";
 import RideRequestCard from "../../components/RideRequestCard";
 import DriverRideStart from "./DriverRideStart";
 
+/* ===== Small Stat Card ===== */
+const StatCard = ({ title, value, color = "text-white" }) => (
+  <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+    <p className="text-sm text-slate-400">{title}</p>
+    <p className={`text-2xl font-bold mt-1 ${color}`}>
+      {value ?? "--"}
+    </p>
+  </div>
+);
+
 export default function DriverDashboard() {
   const navigate = useNavigate();
 
-  const [online, setOnline] = useState(false);
+  const [online, setOnline] = useState(null);
   const [ride, setRide] = useState(null);
   const [kycStatus, setKycStatus] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  /* ================== KYC CHECK ================== */
+  const [analytics, setAnalytics] = useState(null);
+  const [period, setPeriod] = useState("today");
+
+  /* ================= ANALYTICS ================= */
   useEffect(() => {
-    getKYCStatus().then((res) => {
-      setKycStatus(res.data.data?.status);
-    });
+    getDriverAnalytics(period).then((res) =>
+      setAnalytics(res.data.data)
+    );
+  }, [period]);
+
+  /* ================= KYC ================= */
+  useEffect(() => {
+    getKYCStatus().then((res) =>
+      setKycStatus(res.data.data?.status)
+    );
   }, []);
 
-  /* ================== TOGGLE ONLINE ================== */
-  const toggleStatus = async () => {
-    if (kycStatus !== "approved") {
-      alert("Complete & approve KYC to go online");
-      return;
-    }
+  /* ================= DRIVER STATUS ================= */
+  useEffect(() => {
+    const loadStatus = async () => {
+      try {
+        const res = await getDriverStatus();
+        setOnline(res.data.data.isOnline);
+      } catch {
+        setOnline(false);
+      }
+    };
+    loadStatus();
+  }, []);
 
+  /* ================= TOGGLE ================= */
+  const toggleStatus = async () => {
+    setError("");
     try {
       setLoading(true);
       const res = await toggleDriverStatus({
@@ -43,127 +75,165 @@ export default function DriverDashboard() {
       });
       setOnline(res.data.data.isOnline);
     } catch (err) {
-      alert(err.response?.data?.message || "Status change failed");
+      setError(err.response?.data?.message || "Failed to change status");
     } finally {
       setLoading(false);
     }
   };
 
-  /* ================== POLL RIDE REQUEST ================== */
+  /* ================= POLL RIDES ================= */
   useEffect(() => {
-    if (!online || ride) return;
+    if (online !== true || ride) return;
 
     const interval = setInterval(async () => {
       const res = await getRideRequest();
-      if (res.data.data) {
-        setRide(res.data.data);
-      }
+      if (res.data.data) setRide(res.data.data);
     }, 5000);
 
     return () => clearInterval(interval);
   }, [online, ride]);
 
-  /* ================== ACCEPT RIDE ================== */
+  /* ================= ACTIONS ================= */
   const handleAccept = async () => {
-    try {
-      const res = await acceptRide(ride._id);
-      setRide({
-        ...ride,
-        status: "ACCEPTED",
-        otp: res.data?.data?.otp,
-      });
-    } catch {
-      alert("Failed to accept ride");
-    }
+    const res = await acceptRide(ride._id);
+    setRide({ ...ride, status: "ACCEPTED", otp: res.data?.data?.otp });
   };
 
-  /* ================== REJECT RIDE ================== */
   const handleReject = async () => {
     await rejectRide(ride._id);
     setRide(null);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 p-6">
-      {/* HEADER */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-extrabold text-gray-800">
-          Driver Dashboard
-        </h1>
+    <div className="min-h-screen bg-gradient-to-b from-black to-slate-950 text-white p-4 md:p-6">
+      <div className="max-w-5xl mx-auto space-y-6">
 
-        <button
-          onClick={() => navigate("/driver/history")}
-          className="text-sm font-semibold text-gray-700 hover:text-black"
-        >
-          Ride History →
-        </button>
-      </div>
+        {/* HEADER */}
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold">🚖 Driver Dashboard</h1>
 
-      {/* KYC ALERT */}
-      {kycStatus !== "approved" && (
-        <div className="mb-6 rounded-xl border border-yellow-300 bg-yellow-100 p-5 shadow">
-          <p className="font-semibold text-yellow-800">
-            ⚠ Complete your KYC to earn money and get rides
-          </p>
           <button
-            onClick={() => navigate("/driver/kyc")}
-            className="mt-3 rounded-lg bg-black px-5 py-2 text-white hover:bg-gray-900"
+            onClick={() => navigate("/driver/history")}
+            className="text-sm text-slate-400 hover:text-white"
           >
-            Complete KYC
+            Ride History →
           </button>
         </div>
-      )}
 
-      {/* STATUS CARD */}
-      <div className="mb-6 rounded-xl bg-white p-6 shadow-md">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-gray-500">Current Status</p>
-            <p
-              className={`text-xl font-bold ${
-                online ? "text-green-600" : "text-red-600"
-              }`}
+        {/* KYC WARNING */}
+        {kycStatus !== "approved" && (
+          <div className="bg-yellow-900/30 border border-yellow-700 rounded-xl p-4 flex justify-between items-center">
+            <div>
+              <p className="font-medium text-yellow-400">
+                KYC Pending
+              </p>
+              <p className="text-sm text-yellow-300">
+                Complete KYC to receive rides
+              </p>
+            </div>
+            <button
+              onClick={() => navigate("/driver/kyc")}
+              className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg text-sm"
             >
-              {online ? "ONLINE" : "OFFLINE"}
-            </p>
+              Complete KYC
+            </button>
+          </div>
+        )}
+
+        {/* ANALYTICS */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-slate-400 text-sm">Performance</p>
+
+            <select
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+              className="bg-slate-900 border border-slate-700 text-sm rounded-lg px-3 py-1"
+            >
+              <option value="today">Today</option>
+              <option value="week">This Week</option>
+              <option value="month">This Month</option>
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatCard title="Accepted" value={analytics?.rides.accepted} />
+            <StatCard
+              title="Rejected"
+              value={analytics?.rides.rejected}
+              color="text-red-400"
+            />
+            <StatCard
+              title="Completed"
+              value={analytics?.rides.completed}
+              color="text-green-400"
+            />
+            <StatCard
+              title="Earnings ₹"
+              value={analytics?.earnings.driverEarning}
+              color="text-emerald-400"
+            />
+
+            <StatCard
+              title="Cash Collected ₹"
+              value={`-₹${analytics?.earnings.cashCollected ?? 0}`}
+              color="text-yellow-400"
+            />
+
+          </div>
+        </div>
+
+        {/* STATUS CARD */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex items-center justify-between">
+          <div>
+            <p className="text-sm text-slate-400">Current Status</p>
+            <span
+              className={`inline-block mt-1 px-3 py-1 rounded-full text-sm font-medium
+                ${online
+                  ? "bg-green-500/20 text-green-400"
+                  : "bg-red-500/20 text-red-400"
+                }`}
+            >
+              {online === null ? "Checking..." : online ? "Online" : "Offline"}
+            </span>
           </div>
 
           <button
-            disabled={loading}
+            disabled={loading || online === null || kycStatus !== "approved"}
             onClick={toggleStatus}
-            className={`rounded-full px-6 py-2 font-semibold text-white transition ${
-              online
+            className={`h-11 px-6 rounded-full font-medium transition
+              ${online
                 ? "bg-red-600 hover:bg-red-700"
                 : "bg-green-600 hover:bg-green-700"
-            }`}
+              }
+              disabled:opacity-50
+            `}
           >
             {loading ? "Please wait..." : online ? "Go Offline" : "Go Online"}
           </button>
         </div>
-      </div>
 
-      {/* RIDE FLOW */}
-      {ride && ride.status === "REQUESTED" && (
-        <div className="animate-fade-in">
+        {/* ERROR */}
+        {error && (
+          <div className="bg-red-900/30 border border-red-700 text-red-400 p-3 rounded-lg">
+            {error}
+          </div>
+        )}
+
+        {/* RIDE REQUEST */}
+        {ride && ride.status === "REQUESTED" && (
           <RideRequestCard
             ride={ride}
             onAccept={handleAccept}
             onReject={handleReject}
           />
-        </div>
-      )}
+        )}
 
-      {ride && ride.status === "ACCEPTED" && (
-        <div className="animate-fade-in">
+        {/* ACCEPTED */}
+        {ride && ride.status === "ACCEPTED" && (
           <DriverRideStart ride={ride} />
-        </div>
-      )}
-
-      {!ride && online && (
-        <div className="rounded-xl bg-white p-6 text-center text-gray-500 shadow">
-          Waiting for ride requests…
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
