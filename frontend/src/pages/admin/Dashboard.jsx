@@ -218,6 +218,7 @@ export default function AdminDashboard() {
                   <td className="py-3 px-4">
                     <Pill className={statusClass(r.status)}>{r.status}</Pill>
                   </td>
+                
 
                   <td className="py-3 px-4 text-gray-600">
                     {fmtDateTime(r.createdAt)}
@@ -256,6 +257,11 @@ export default function AdminDashboard() {
           title="Support | SOS"
           desc="Handle SOS / feedback (if enabled)."
           href="/admin/sos"
+        />
+        <QuickAction
+          title="Payout"
+          desc="Handle payment of drivers (Weekly Payout)."
+          href="/admin/payouts"
         />
       </div>
     </div>
