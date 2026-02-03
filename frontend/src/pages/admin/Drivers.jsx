@@ -1,36 +1,38 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { blockUnblockDriver, getAdminDrivers } from "../../services/admin.api";
 import AdminKYCModal from "./AdminKYCModal";
 import { io } from "socket.io-client";
 
-
 export default function AdminDrivers() {
   const socket = io("http://localhost:5000");
+
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState([]);
-  const [filters, setFilters] = useState({
-    q: "",
-    isOnline: "",
-    isAvailable: "",
-  });
+  const [filters, setFilters] = useState({ q: "", isOnline: "", city: "" });
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [selectedDriverId, setSelectedDriverId] = useState(null);
 
+  // Time formatting helper
   function timeAgo(date) {
     if (!date) return "—";
     const seconds = Math.floor((new Date() - new Date(date)) / 1000);
-
     if (seconds < 60) return "Just now";
-    if (seconds < 3600) return Math.floor(seconds / 60) + " min ago";
-    if (seconds < 86400) return Math.floor(seconds / 3600) + " hr ago";
-    return Math.floor(seconds / 86400) + " days ago";
+    if (seconds < 3600) return Math.floor(seconds / 60) + "m ago";
+    if (seconds < 86400) return Math.floor(seconds / 3600) + "h ago";
+    return Math.floor(seconds / 86400) + "d ago";
   }
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const res = await getAdminDrivers({ ...filters, page, limit: 20 });
+      const res = await getAdminDrivers({
+        q: filters.q,
+        isOnline: filters.isOnline,
+        preferredCity: filters.city,
+        page,
+        limit: 20,
+      });
       setRows(res?.data || []);
       setPages(res?.pagination?.pages || 1);
     } finally {
@@ -38,215 +40,207 @@ export default function AdminDrivers() {
     }
   };
 
-useEffect(() => {
-  fetchData();
+  const cities = useMemo(() => {
+    const set = new Set();
+    (rows || []).forEach((d) => {
+      const c = d?.preferredCity || d?.city || d?.driverProfile?.preferredCity || d?.driverProfile?.city;
+      if (c && typeof c === "string") set.add(c.trim());
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [rows]);
 
-  socket.on("driver_status_updated", (payload) => {
-    console.log("LIVE UPDATE:", payload);
-
-    setRows((prev) =>
-      prev.map((d) =>
-        d._id === payload.driverId
-          ? {
-              ...d,
-              driverStatus: {
-                ...(d.driverStatus || {}),
-                isOnline: payload.isOnline,
-                lastSeen: payload.lastSeen,
-                location: payload.location,
-              },
-            }
-          : d
-      )
-    );
-  });
-
-  return () => {
-    socket.off("driver_status_updated");
-  };
-}, []);
-
-  const apply = () => {
-    setPage(1);
+  useEffect(() => {
     fetchData();
-  };
+    socket.on("driver_status_updated", (payload) => {
+      setRows((prev) =>
+        prev.map((d) =>
+          d._id === payload.driverId
+            ? { ...d, driverStatus: { ...(d.driverStatus || {}), isOnline: payload.isOnline, lastSeen: payload.lastSeen, location: payload.location } }
+            : d
+        )
+      );
+    });
+    return () => socket.off("driver_status_updated");
+  }, []);
+
+  useEffect(() => { fetchData(); }, [page]);
 
   const toggleBlock = async (driver) => {
     const isBlocked = driver.isBlocked;
-    await blockUnblockDriver(
-      driver._id,
-      isBlocked ? { block: false } : { block: true, minutes: 1440 },
-    );
+    await blockUnblockDriver(driver._id, isBlocked ? { block: false } : { block: true, minutes: 1440 });
     fetchData();
   };
 
-  if (loading) return <div className="p-6">Loading...</div>;
+  // Luxury Status Badge
+  const StatusBadge = ({ online }) => (
+    <div className="flex items-center gap-1.5">
+      <span className={`h-2 w-2 rounded-full ${online ? "bg-green-500 animate-pulse" : "bg-stone-300"}`} />
+      <span className={`text-[10px] font-black uppercase tracking-widest ${online ? "text-green-600" : "text-stone-400"}`}>
+        {online ? "Online" : "Offline"}
+      </span>
+    </div>
+  );
+
+  if (loading) return (
+    <div className="p-12 flex flex-col items-center justify-center min-h-[60vh] bg-[#FBF9F6]">
+      <div className="animate-spin h-8 w-8 border-4 border-[#C05D38] border-t-transparent rounded-full mb-4" />
+      <div className="text-stone-400 text-xs font-black uppercase tracking-[0.3em]">Syncing Fleet...</div>
+    </div>
+  );
 
   return (
-    <div className="p-6 space-y-4">
-      <h1 className="text-xl font-bold">Drivers</h1>
+    <div className="p-6 space-y-6 bg-[#FBF9F6] min-h-screen font-sans">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-stone-200 pb-6">
+        <div>
+          <span className="text-[#C05D38] text-[10px] font-black uppercase tracking-[0.3em]">Fleet Management</span>
+          <h1 className="text-3xl font-black text-stone-900 tracking-tighter uppercase">Driver Partners</h1>
+        </div>
+      </div>
 
-      <div className="bg-white rounded-xl border p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+      {/* FILTER SECTION */}
+      <div className="bg-white rounded-2xl border border-stone-100 p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 shadow-sm">
         <input
-          className="border rounded-lg px-3 py-2"
-          placeholder="Search name/email/mobile"
+          className="bg-[#F9F6F0] border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#C05D38]/20 transition-all outline-none text-stone-800 placeholder-stone-400"
+          placeholder="Search identity..."
           value={filters.q}
           onChange={(e) => setFilters((p) => ({ ...p, q: e.target.value }))}
         />
 
         <select
-          className="border rounded-lg px-3 py-2"
+          className="bg-[#F9F6F0] border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#C05D38]/20 transition-all outline-none text-stone-600 font-bold uppercase tracking-widest text-[10px]"
           value={filters.isOnline}
-          onChange={(e) =>
-            setFilters((p) => ({ ...p, isOnline: e.target.value }))
-          }
+          onChange={(e) => setFilters((p) => ({ ...p, isOnline: e.target.value }))}
         >
-          <option value="">Online: All</option>
-          <option value="true">Online: Yes</option>
-          <option value="false">Online: No</option>
+          <option value="">Availability</option>
+          <option value="true">Online</option>
+          <option value="false">Offline</option>
         </select>
 
         <select
-          className="border rounded-lg px-3 py-2"
-          value={filters.isAvailable}
-          onChange={(e) =>
-            setFilters((p) => ({ ...p, isAvailable: e.target.value }))
-          }
+          className="bg-[#F9F6F0] border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#C05D38]/20 transition-all outline-none text-stone-600 font-bold uppercase tracking-widest text-[10px]"
+          value={filters.city}
+          onChange={(e) => setFilters((p) => ({ ...p, city: e.target.value }))}
         >
-          <option value="">Available: All</option>
-          <option value="true">Available: Yes</option>
-          <option value="false">Available: No</option>
+          <option value="">Region</option>
+          {cities.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
 
         <button
-          onClick={apply}
-          className="bg-black text-white rounded-lg px-4 py-2 font-semibold"
+          onClick={() => { setPage(1); fetchData(); }}
+          className="bg-stone-900 text-white rounded-xl px-4 py-3 font-black text-[10px] uppercase tracking-[0.2em] hover:bg-stone-800 transition-all shadow-md active:scale-95"
         >
-          Apply
+          Apply Filters
         </button>
       </div>
 
-      <div className="bg-white rounded-xl border p-4 overflow-auto">
-        <table className="w-full text-sm">
-          <thead className="text-left text-gray-500">
+      {/* TABLE VIEW */}
+      <div className="hidden md:block bg-white rounded-3xl border border-stone-100 shadow-sm overflow-hidden">
+        <table className="w-full text-left">
+          <thead className="bg-[#F9F6F0]/50 border-b border-stone-50">
             <tr>
-              <th className="py-2">Name</th>
-              <th>Email</th>
-              <th>Mobile</th>
-              <th>Online</th>
-              <th>Available</th>
-              <th>Location</th>
-              <th>Blocked</th>
-              <th></th>
+              <th className="py-4 px-6 text-[10px] font-black text-stone-400 uppercase tracking-widest">Driver Detail</th>
+              <th className="py-4 px-6 text-[10px] font-black text-stone-400 uppercase tracking-widest">Availability</th>
+              <th className="py-4 px-6 text-[10px] font-black text-stone-400 uppercase tracking-widest">Last Movement</th>
+              <th className="py-4 px-6 text-[10px] font-black text-stone-400 uppercase tracking-widest">Status</th>
+              <th className="py-4 px-6 text-right"></th>
             </tr>
           </thead>
-          <tbody>
-  {rows.map((d) => (
-    <tr key={d._id} className="border-t hover:bg-gray-50 transition">
-      {/* Name */}
-      <td className="py-3 font-semibold">{d.name || "—"}</td>
-
-      {/* Email */}
-      <td>{d.email || "—"}</td>
-
-      {/* Mobile */}
-      <td>{d.mobile || "—"}</td>
-
-      {/* Online */}
-      <td>
-        {d.driverStatus?.isOnline ? (
-          <span className="flex items-center gap-1 text-green-600 font-bold">
-            ● Online
-          </span>
-        ) : (
-          <span className="flex items-center gap-1 text-gray-500">
-            ● Offline
-          </span>
-        )}
-      </td>
-
-      {/* Last Seen */}
-      <td className="text-xs text-gray-600">
-        {d.driverStatus?.isOnline
-          ? "Active now"
-          : d.driverStatus?.lastSeen
-          ? `Last seen ${timeAgo(d.driverStatus.lastSeen)}`
-          : "Never online"}
-      </td>
-
-      {/* Location */}
-      <td className="text-xs text-gray-500">
-        {d.driverStatus?.location?.lat ? (
-          <>📍 {d.driverStatus.location.lat.toFixed(4)}, {d.driverStatus.location.lng.toFixed(4)}</>
-        ) : (
-          "—"
-        )}
-      </td>
-
-      {/* Blocked */}
-      <td className={d.isBlocked ? "text-red-600 font-bold" : "text-gray-500"}>
-        {d.isBlocked ? "Blocked" : "No"}
-      </td>
-
-      {/* Actions */}
-      <td className="text-right space-x-2">
-        <button
-          onClick={() => toggleBlock(d)}
-          className={`rounded-lg px-3 py-2 font-semibold ${
-            d.isBlocked ? "bg-gray-800 text-white" : "bg-red-600 text-white"
-          }`}
-        >
-          {d.isBlocked ? "Unblock" : "Block"}
-        </button>
-
-        <button
-          onClick={() => setSelectedDriverId(d._id)}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg font-semibold"
-        >
-          View KYC
-        </button>
-      </td>
-    </tr>
-  ))}
-
-  {!rows.length && (
-    <tr>
-      <td colSpan={8} className="py-6 text-center text-gray-500">
-        No drivers
-      </td>
-    </tr>
-  )}
-</tbody>
-
+          <tbody className="divide-y divide-stone-50">
+            {rows.map((d) => (
+              <tr key={d._id} className="hover:bg-[#F9F6F0]/20 transition-colors group">
+                <td className="py-5 px-6">
+                  <div className="font-bold text-stone-900">{d.name || "—"}</div>
+                  <div className="text-[10px] text-stone-400 uppercase font-medium tracking-tight">
+                    {d.email} • {d.mobile}
+                  </div>
+                </td>
+                <td className="py-5 px-6">
+                  <StatusBadge online={d.driverStatus?.isOnline} />
+                </td>
+                <td className="py-5 px-6">
+                  <div className="text-[10px] font-bold text-stone-500 uppercase">
+                    {d.driverStatus?.isOnline ? "Active Now" : d.driverStatus?.lastSeen ? timeAgo(d.driverStatus.lastSeen) : "Inactive"}
+                  </div>
+                  <div className="text-[9px] text-stone-300 font-mono mt-0.5">
+                    {d.driverStatus?.location?.lat ? `${d.driverStatus.location.lat.toFixed(4)}, ${d.driverStatus.location.lng.toFixed(4)}` : "No GPS"}
+                  </div>
+                </td>
+                <td className="py-5 px-6">
+                  <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
+                    d.isBlocked ? "bg-red-50 text-red-600 border border-red-100" : "bg-green-50 text-green-600 border border-green-100"
+                  }`}>
+                    {d.isBlocked ? "Blocked" : "Verified"}
+                  </span>
+                </td>
+                <td className="py-5 px-6 text-right space-x-3">
+                  <button
+                    onClick={() => toggleBlock(d)}
+                    className={`text-[10px] font-black uppercase tracking-widest transition-colors ${
+                      d.isBlocked ? "text-stone-900 hover:text-stone-600" : "text-red-500 hover:text-red-700"
+                    }`}
+                  >
+                    {d.isBlocked ? "Unblock" : "Block"}
+                  </button>
+                  <button
+                    onClick={() => setSelectedDriverId(d._id)}
+                    className="bg-[#C05D38] text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-sm hover:bg-[#A84C2C] transition-all"
+                  >
+                    View KYC
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
         </table>
-
-        <div className="mt-4 flex justify-between">
-          <button
-            className="px-3 py-2 rounded-lg border"
-            disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
-          >
-            Prev
-          </button>
-          <div className="text-sm text-gray-600">
-            Page {page} / {pages}
-          </div>
-          <button
-            className="px-3 py-2 rounded-lg border"
-            disabled={page >= pages}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Next
-          </button>
-        </div>
       </div>
-      {/* Modal render */}
+
+      {/* MOBILE VIEW CARDS */}
+      <div className="md:hidden space-y-4">
+        {rows.map((d) => (
+          <div key={d._id} className="bg-white border border-stone-100 rounded-2xl p-5 space-y-4 shadow-sm">
+            <div className="flex justify-between items-start">
+              <div>
+                <div className="font-bold text-stone-900">{d.name}</div>
+                <div className="text-[10px] text-stone-400 uppercase font-bold">{d.mobile}</div>
+              </div>
+              <StatusBadge online={d.driverStatus?.isOnline} />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => toggleBlock(d)} className="flex-1 border border-stone-200 rounded-xl py-3 text-[10px] font-black uppercase tracking-widest text-stone-600">
+                {d.isBlocked ? "Unblock" : "Block"}
+              </button>
+              <button onClick={() => setSelectedDriverId(d._id)} className="flex-1 bg-stone-900 text-white rounded-xl py-3 text-[10px] font-black uppercase tracking-widest">
+                KYC
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* PAGINATION */}
+      <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-stone-100 shadow-sm">
+        <button
+          className="text-[10px] font-black uppercase tracking-widest text-stone-400 hover:text-stone-900 disabled:opacity-30"
+          disabled={page <= 1}
+          onClick={() => setPage((p) => p - 1)}
+        >
+          ← Previous
+        </button>
+        <div className="text-[10px] font-black uppercase tracking-[0.3em] text-stone-900">
+          Page {page} / {pages}
+        </div>
+        <button
+          className="text-[10px] font-black uppercase tracking-widest text-stone-400 hover:text-stone-900 disabled:opacity-30"
+          disabled={page >= pages}
+          onClick={() => setPage((p) => p + 1)}
+        >
+          Next →
+        </button>
+      </div>
+
       {selectedDriverId && (
-        <AdminKYCModal
-          driverId={selectedDriverId}
-          onClose={() => setSelectedDriverId(null)}
-          onUpdated={fetchData}
-        />
+        <AdminKYCModal driverId={selectedDriverId} onClose={() => setSelectedDriverId(null)} onUpdated={fetchData} />
       )}
     </div>
   );

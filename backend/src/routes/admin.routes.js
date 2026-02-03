@@ -14,6 +14,7 @@ import {
   weeklyDriverEarnings,listWeeklyPayouts
 } from "../controllers/admin.payout.controller.js";
 import { getDriverKYC, updateDriverKYC } from "../controllers/admin.kyc.controller.js";
+import { getRevenueAnalytics } from "../controllers/adminAnalytics.controller.js";
 
 
 
@@ -46,6 +47,9 @@ router.patch("/drivers/:id/kyc", updateDriverKYC);
 
 //profile
 router.get("/profile", getAdminProfile);
+
+//analytics
+router.get("/analytics/revenue", getRevenueAnalytics);
 
 
 export default router;

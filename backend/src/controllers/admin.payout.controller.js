@@ -1,3 +1,4 @@
+import razorpay, { getOrCreateFundAccount } from "../config/razorpay.js";
 import Payout from "../models/Payout.model.js";
 import Ride from "../models/Ride.model.js";
 
@@ -110,63 +111,97 @@ export const weeklyDriverEarnings = async (req, res) => {
 };
 
 
+function normalizeDateOnly(d) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
 export const payWeeklyNow = async (req, res) => {
   try {
     const { start, end, note = "" } = req.body;
     if (!start || !end) return res.status(400).json({ message: "start and end required" });
 
-    const startDate = new Date(start);
-    const endDate = new Date(end);
+    const weekStart = normalizeDateOnly(start);
+    const weekEnd = new Date(end);
 
-    const rows = await Ride.aggregate([
-      {
-        $match: {
-          status: "COMPLETED",
-          completedAt: { $gte: startDate, $lte: endDate },
-          driverId: { $ne: null },
-        },
-      },
-      {
-        $addFields: {
-          fareTotal: { $ifNull: ["$fareBreakdown.totalFare", 0] },
-          driverShare: { $multiply: [{ $ifNull: ["$fareBreakdown.totalFare", 0] }, 0.5] },
-        },
-      },
-      {
-        $group: {
-          _id: "$driverId",
-          rides: { $sum: 1 },
-          gross: { $sum: "$fareTotal" },
-          payable: { $sum: "$driverShare" },
-        },
-      },
-    ]);
+    const payouts = await Payout.find({
+      weekStart,
+      status: { $in: ["PENDING", "FAILED"] }, // ✅ retry allow
+    }).populate("driverId");
 
-    // ✅ upsert payouts
-    const ops = rows.map((r) => ({
-      updateOne: {
-        filter: { driverId: r._id, weekStart: startDate },
-        update: {
-          $setOnInsert: { driverId: r._id, weekStart: startDate, weekEnd: endDate },
-          $set: { rides: r.rides, gross: r.gross, payable: r.payable },
-        },
-        upsert: true,
-      },
-    }));
-    if (ops.length) await Payout.bulkWrite(ops);
+    let successCount = 0;
+    let failCount = 0;
 
-    // ✅ mark PAID for this week
-    const paidAt = new Date();
-    const result = await Payout.updateMany(
-      { weekStart: startDate, status: { $ne: "PAID" } },
-      { $set: { status: "PAID", paidAt, note } }
-    );
+    for (const p of payouts) {
+      const driver = p.driverId;
+
+      try {
+        // 1) try primary (bank if present else upi)
+        let fa = await getOrCreateFundAccount(driver);
+
+        const rp = await razorpay.payouts.create({
+          account_number: process.env.RAZORPAY_X_ACCOUNT,
+          fund_account_id: fa.id,
+          amount: Math.round(Number(p.payable || 0) * 100), // paise
+          currency: "INR",
+          mode: fa.account_type === "bank_account" ? "IMPS" : "UPI",
+          purpose: "payout",
+          narration: note || `Weekly payout ${weekStart.toISOString().slice(0,10)}`,
+          reference_id: String(p._id),
+          queue_if_low_balance: true,
+        });
+
+        p.razorpayPayoutId = rp.id;
+        p.status = "PROCESSING";
+        p.note = note;
+        p.weekEnd = weekEnd;
+        p.failureReason = null;
+        await p.save();
+
+        successCount++;
+      } catch (err1) {
+        // 2) fallback try UPI (only if bank attempt likely)
+        try {
+          const driverDoc = p.driverId;
+
+          const vpaId = driverDoc?.payout?.razorpayFundAccountIdVpa;
+          if (!vpaId) throw new Error(err1?.message || "Bank payout failed and no UPI found");
+
+          const rp2 = await razorpay.payouts.create({
+            account_number: process.env.RAZORPAY_X_ACCOUNT,
+            fund_account_id: vpaId,
+            amount: Math.round(Number(p.payable || 0) * 100),
+            currency: "INR",
+            mode: "UPI",
+            purpose: "payout",
+            narration: note || `Weekly payout ${weekStart.toISOString().slice(0,10)}`,
+            reference_id: String(p._id),
+            queue_if_low_balance: true,
+          });
+
+          p.razorpayPayoutId = rp2.id;
+          p.status = "PROCESSING";
+          p.note = note;
+          p.failureReason = null;
+          await p.save();
+
+          successCount++;
+        } catch (err2) {
+          p.status = "FAILED";
+          p.failureReason = err2?.message || err1?.message || "Payout failed";
+          await p.save();
+          failCount++;
+        }
+      }
+    }
 
     return res.json({
       success: true,
-      message: "Weekly payouts paid",
-      generated: ops.length,
-      markedPaid: result.modifiedCount ?? 0,
+      message: "Payout processing started (webhook will mark PAID/FAILED)",
+      total: payouts.length,
+      sentToRazorpay: successCount,
+      failedInstant: failCount,
     });
   } catch (e) {
     console.error("payWeeklyNow error:", e);

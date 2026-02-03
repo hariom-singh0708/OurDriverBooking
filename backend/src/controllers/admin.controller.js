@@ -3,6 +3,8 @@ import Ride from "../models/Ride.model.js";
 import KYC from "../models/KYC.model.js";
 import UserModel from "../models/User.model.js";
 import DriverStatusModel from "../models/DriverStatus.model.js";
+import razorpay from "../config/razorpay.js";
+
 
 const ACTIVE_STATUSES = ["REQUESTED", "ACCEPTED", "DRIVER_ARRIVED", "ON_RIDE"];
 
@@ -215,3 +217,56 @@ export const getAdminProfile = async (req, res) => {
     data: user,
   });
 };
+
+
+export const setupDriverPayout = async (req, res) => {
+  const { driverId } = req.params;
+  const { upiId, bank } = req.body; // one of them required
+
+  const driver = await User.findById(driverId);
+  if (!driver) return res.status(404).json({ message: "Driver not found" });
+
+  // 1️⃣ Create Razorpay Contact (once)
+  if (!driver.razorpayContactId) {
+    const contact = await razorpay.contacts.create({
+      name: driver.name,
+      email: driver.email,
+      contact: driver.mobile,
+      type: "vendor",
+    });
+    driver.razorpayContactId = contact.id;
+  }
+
+  // 2️⃣ Create Fund Account
+  let fundAccount;
+
+  if (upiId) {
+    fundAccount = await razorpay.fund_accounts.create({
+      contact_id: driver.razorpayContactId,
+      account_type: "vpa",
+      vpa: { address: upiId },
+    });
+    driver.mode = "UPI";
+  } else {
+    fundAccount = await razorpay.fund_accounts.create({
+      contact_id: driver.razorpayContactId,
+      account_type: "bank_account",
+      bank_account: {
+        name: bank.name,
+        ifsc: bank.ifsc,
+        account_number: bank.accountNumber,
+      },
+    });
+    driver.mode = "BANK";
+  }
+
+  driver.razorpayFundAccountId = fundAccount.id;
+  await driver.save();
+
+  res.json({
+    success: true,
+    message: "Payout account linked",
+    fundAccountId: fundAccount.id,
+  });
+};
+

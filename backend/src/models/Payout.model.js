@@ -8,8 +8,12 @@ const payoutSchema = new mongoose.Schema(
     rides: { type: Number, default: 0 },
     gross: { type: Number, default: 0 },
 payable: { type: Number, default: 0 },  // 50% driver earning
+  // 🔥 Razorpay
+    razorpayPayoutId: { type: String },
+    failureReason: { type: String },
 
-    status: { type: String, enum: ["PENDING", "PAID"], default: "PENDING" },
+    status: { type: String,      enum: ["PENDING", "PROCESSING", "PAID", "FAILED"],
+ default: "PENDING" },
     paidAt: { type: Date, default: null },
     note: { type: String, default: "" },
   },

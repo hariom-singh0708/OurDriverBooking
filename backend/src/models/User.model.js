@@ -109,6 +109,18 @@ const userSchema = new mongoose.Schema(
         default: 0,
       },
     },
+    // Account
+upiId: { type: String },
+
+bank: {
+  accountNumber: String,
+  ifsc: String,
+  name: String,
+},
+
+razorpayContactId: String,
+razorpayFundAccountId: String,
+
   },
   
   { timestamps: true }

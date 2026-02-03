@@ -13,11 +13,16 @@ import historyRoutes from "./routes/history.routes.js";
 import chatRoutes from "./routes/chat.routes.js";
 import sosRoutes from "./routes/sos.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
+import { razorpayWebhook } from "./controllers/webhook.controller.js";
 
 
 
 
 const app = express();
+
+
+app.post("/webhooks/razorpay", express.raw({ type: "application/json" }), razorpayWebhook);
+
 
 // Middleware
 app.use(cors());
@@ -44,6 +49,7 @@ app.use("/history", historyRoutes);
 app.use("/chat", chatRoutes);
 app.use("/sos", sosRoutes);
 app.use("/admin", adminRoutes);
+
 
 
 
