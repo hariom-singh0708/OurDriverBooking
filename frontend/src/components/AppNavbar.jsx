@@ -7,10 +7,12 @@ export default function AppNavbar() {
   // 🔍 role detect from URL
   const isClient = location.pathname.startsWith("/client");
   const isDriver = location.pathname.startsWith("/driver");
+  const isAdmin = location.pathname.startsWith("/admin");
 
   const handleProfileClick = () => {
     if (isClient) navigate("/client/profile");
     else if (isDriver) navigate("/driver/profile");
+    else if (isAdmin) navigate("/admin/profile");
   };
 
   return (
@@ -21,6 +23,7 @@ export default function AppNavbar() {
           onClick={() => {
             if (isClient) navigate("/client");
             if (isDriver) navigate("/driver");
+            if (isAdmin) navigate("/admin/dashboard");
           }}
           className="text-white font-extrabold text-lg cursor-pointer"
         >
@@ -28,7 +31,7 @@ export default function AppNavbar() {
         </div>
 
         {/* PROFILE ONLY */}
-        {(isClient || isDriver) && (
+        {(isClient || isDriver ||isAdmin) && (
           <button
             onClick={handleProfileClick}
             className="rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-500 px-5 py-2 text-white font-semibold hover:opacity-90"

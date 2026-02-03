@@ -1,7 +1,8 @@
 import User from "../models/User.model.js";
 import Ride from "../models/Ride.model.js";
-import DriverStatus from "../models/DriverStatus.model.js";
 import KYC from "../models/KYC.model.js";
+import UserModel from "../models/User.model.js";
+import DriverStatusModel from "../models/DriverStatus.model.js";
 
 const ACTIVE_STATUSES = ["REQUESTED", "ACCEPTED", "DRIVER_ARRIVED", "ON_RIDE"];
 
@@ -26,66 +27,95 @@ export const getAdminStats = async (req, res) => {
   }
 };
 
+
 export const listDrivers = async (req, res) => {
   try {
-    const { q = "", city = "", isOnline, isAvailable, kycStatus, page = 1, limit = 20 } = req.query;
+    const {
+      q = "",
+      city = "",            // (optional) only if your DriverStatus has city
+      isOnline,             // "true" | "false" | undefined
+      // isAvailable,        // ❌ DriverStatus schema me nahi hai
+      kycStatus,
+      page = 1,
+      limit = 20,
+    } = req.query;
 
     const pageNum = Math.max(1, Number(page) || 1);
     const limitNum = Math.min(100, Math.max(1, Number(limit) || 20));
     const skip = (pageNum - 1) * limitNum;
 
+    // 1) Users (drivers)
     const userMatch = { role: "driver" };
 
     if (q.trim()) {
+      const qq = q.trim();
       userMatch.$or = [
-        { name: { $regex: q.trim(), $options: "i" } },
-        { email: { $regex: q.trim(), $options: "i" } },
-        { mobile: { $regex: q.trim(), $options: "i" } },
+        { name: { $regex: qq, $options: "i" } },
+        { email: { $regex: qq, $options: "i" } },
+        { mobile: { $regex: qq, $options: "i" } },
       ];
     }
 
     const [drivers, total] = await Promise.all([
-      User.find(userMatch).select("-password").sort({ createdAt: -1 }).skip(skip).limit(limitNum),
-      User.countDocuments(userMatch),
+      UserModel.find(userMatch)
+        .select("-password")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+      UserModel.countDocuments(userMatch),
     ]);
 
     const driverIds = drivers.map((d) => d._id);
 
-    const statusMatch = { driver: { $in: driverIds } };
-    if (city) statusMatch.city = city;
-    if (typeof isOnline !== "undefined") statusMatch.isOnline = String(isOnline) === "true";
-    if (typeof isAvailable !== "undefined") statusMatch.isAvailable = String(isAvailable) === "true";
+    // 2) DriverStatus (driverId)
+    const statusMatch = { driverId: { $in: driverIds } };
 
-    const statuses = await DriverStatus.find(statusMatch).lean();
-    const statusMap = new Map(statuses.map((s) => [String(s.driver), s]));
+    if (typeof isOnline !== "undefined" && isOnline !== "") {
+      statusMatch.isOnline = String(isOnline) === "true";
+    }
 
-    let kycMap = new Map();
-    try {
-      const kycs = await KYC.find({ driver: { $in: driverIds } }).lean();
-      kycMap = new Map(kycs.map((k) => [String(k.driver), k]));
-    } catch {}
+    // ✅ Only add if your schema really has city, else remove this block
+    if (city) {
+      statusMatch.city = city;
+    }
 
+    const statuses = await DriverStatusModel.find(statusMatch).lean();
+    const statusMap = new Map(statuses.map((s) => [String(s.driverId), s]));
+
+    // 3) KYC (userId)
+    const kycs = await KYC.find({ userId: { $in: driverIds } }).lean();
+    const kycMap = new Map(kycs.map((k) => [String(k.userId), k]));
+
+    // 4) Merge
     let data = drivers.map((d) => {
       const st = statusMap.get(String(d._id)) || null;
       const kyc = kycMap.get(String(d._id)) || null;
 
       return {
-        ...d.toObject(),
-        status: st,
+        ...d,
+        status: st,            // ✅ frontend uses d.status?.isOnline / lastSeen / location
+        driverStatus: st,      // (optional) keep for debugging if you want
         kyc,
         isBlocked: d.blockedUntil ? new Date(d.blockedUntil) > new Date() : false,
       };
     });
 
+    // 5) Filter by kycStatus (submitted/under_review/approved)
     if (kycStatus) {
-      const want = String(kycStatus).toUpperCase();
-      data = data.filter((x) => (x.kyc?.status || "").toUpperCase() === want);
+      const want = String(kycStatus).toLowerCase();
+      data = data.filter((x) => (x.kyc?.status || "").toLowerCase() === want);
     }
 
     return res.json({
       success: true,
       data,
-      pagination: { page: pageNum, limit: limitNum, total, pages: Math.ceil(total / limitNum) },
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        pages: Math.ceil(total / limitNum),
+      },
     });
   } catch (err) {
     console.error("listDrivers error:", err);
@@ -172,4 +202,16 @@ export const toggleDriverBlock = async (req, res) => {
     console.error("toggleDriverBlock error:", err);
     return res.status(500).json({ message: "Server error" });
   }
+};
+
+/**
+ * GET /admin/profile
+ */
+export const getAdminProfile = async (req, res) => {
+  const user = await User.findById(req.user._id).select("-password");
+
+  res.json({
+    success: true,
+    data: user,
+  });
 };

@@ -35,3 +35,10 @@ export const blockUnblockDriver = async (driverId, payload) => {
   );
   return data;
 };
+
+export const getAdminProfile = () =>
+  axios.get(`${API_BASE}/admin/profile`, {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+  });
