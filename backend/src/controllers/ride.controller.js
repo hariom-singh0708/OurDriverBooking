@@ -31,10 +31,12 @@ export const markDriverArrived = async (req, res) => {
   const io = getIO();
   io.to(ride._id.toString()).emit("ride_status_update", {
     status: "DRIVER_ARRIVED",
+    otp: ride.otp, // 🔑 THIS WAS MISSING
   });
 
   res.json({ success: true, message: "Driver arrived at pickup" });
 };
+
 
 export const verifyRideOTP = async (req, res) => {
   const { otp } = req.body;

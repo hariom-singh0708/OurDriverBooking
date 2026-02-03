@@ -1,6 +1,7 @@
 import { useEffect, useState, useContext } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
+
 import { SocketContext } from "../../context/SocketContext";
 import { rateDriver } from "../../services/client.api";
 import { cancelRide } from "../../services/ride.api";
@@ -40,7 +41,7 @@ export default function LiveRide() {
   const [rating, setRating] = useState(5);
   const [feedback, setFeedback] = useState("");
 
-  /* ================= INITIAL LOAD (REFRESH SAFE) ================= */
+  /* ================= INITIAL LOAD ================= */
   useEffect(() => {
     const loadRide = async () => {
       try {
@@ -59,15 +60,16 @@ export default function LiveRide() {
         setDrop(data.dropLocation);
         setRideStatus(data.status);
         setDriver(data.driver || null);
+        setOtp(data.otp || null);
       } catch {
         alert("Ride not found");
       }
     };
 
     loadRide();
-  }, [rideId, navigate]);
+  }, [rideId]);
 
-  /* ================= SOCKET SETUP ================= */
+  /* ================= SOCKET ================= */
   useEffect(() => {
     if (!socket || !rideId) return;
 
@@ -81,9 +83,10 @@ export default function LiveRide() {
     };
 
     const onDriverAssigned = (data) => {
-      setDriver(data.driver);
-      setRideStatus("ASSIGNED");
-    };
+  setDriver(data.driver);
+  setRideStatus("ACCEPTED"); // ✅ CORRECT
+};
+
 
     const onDriverLocation = ({ lat, lng }) => {
       setDriverLocation({ lat, lng });
@@ -137,8 +140,7 @@ export default function LiveRide() {
       const res = await cancelRide(rideId, { reason: cancelReason });
 
       alert(
-        `Ride cancelled${
-          res.data.penalty ? ` (Penalty ₹${res.data.penalty})` : ""
+        `Ride cancelled${res.data.penalty ? ` (Penalty ₹${res.data.penalty})` : ""
         }`
       );
 
@@ -161,12 +163,13 @@ export default function LiveRide() {
 
   /* ================= STATUS TEXT ================= */
   const statusText = {
-    WAITING: "Looking for nearby driver...",
-    ASSIGNED: "🚕 Driver is coming to pickup",
-    DRIVER_ARRIVED: "Driver arrived. Share OTP",
-    ON_RIDE: "On the way to destination",
-    COMPLETED: "Ride completed",
-  };
+  REQUESTED: "Looking for nearby driver...",
+  ACCEPTED: "🚕 Driver is coming to pickup",
+  DRIVER_ARRIVED: "Driver arrived. Share OTP",
+  ON_RIDE: "On the way to destination",
+  COMPLETED: "Ride completed",
+};
+
 
   /* ================= UI ================= */
   return (
@@ -179,71 +182,70 @@ export default function LiveRide() {
       </div>
 
       {/* OTP */}
-      {otp && rideStatus !== "ON_RIDE" && (
+      {otp && rideStatus === "DRIVER_ARRIVED" && (
         <div className="bg-yellow-100 p-4 rounded text-center">
           <p className="font-bold">Your Ride OTP</p>
           <p className="text-3xl">{otp}</p>
         </div>
       )}
 
-      {/* MAP */}
-      <MapView
-        driverLocation={driverLocation}
-        pickup={pickup}
-        drop={drop}
-        rideStatus={rideStatus}
-      />
+      {/* MAIN RIDE UI (HIDE AFTER COMPLETE) */}
+      {rideStatus !== "COMPLETED" && (
+        <>
+          <MapView
+            driverLocation={driverLocation}
+            pickup={pickup}
+            drop={drop}
+            rideStatus={rideStatus}
+          />
 
-      {/* TRIP DETAILS */}
-      {ride && (
-        <div className="bg-white p-4 rounded space-y-3">
-          <h3 className="text-lg font-semibold">Trip Details</h3>
+          {ride && (
+            <div className="bg-white p-4 rounded space-y-3">
+              <h3 className="text-lg font-semibold">Trip Details</h3>
+              <p><b>Pickup:</b> {ride.pickupLocation.address}</p>
+              <p><b>Drop:</b> {ride.dropLocation.address}</p>
+              <p><b>Ride Type:</b> {ride.rideType}</p>
+              <p><b>Payment:</b> {ride.paymentMode}</p>
 
-          <p><b>Pickup:</b> {ride.pickupLocation.address}</p>
-          <p><b>Drop:</b> {ride.dropLocation.address}</p>
-          <p><b>Ride Type:</b> {ride.rideType}</p>
-          <p><b>Payment:</b> {ride.paymentMode}</p>
+              <div className="flex justify-between font-semibold">
+                <span>Fare</span>
+                <span>₹{ride.fareBreakdown?.totalFare}</span>
+              </div>
+            </div>
+          )}
 
-          <div className="flex justify-between font-semibold">
-            <span>Fare</span>
-            <span>₹{ride.fareBreakdown?.totalFare}</span>
+          {fare && <LiveFare fare={fare} />}
+
+          {driver && (
+            <div className="bg-white p-3 rounded flex gap-3 items-center">
+              <img src={driver.photo} className="w-12 h-12 rounded-full" />
+              <div>
+                <p className="font-bold">{driver.name}</p>
+                <p className="text-sm text-gray-500">
+                  ⭐ {driver.rating} • {driver.vehicleNumber}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <ChatBox rideId={rideId} userId="client" />
+
+          <div className="flex gap-3">
+            <CallButton phone={driver?.phone} />
+            <SOSButton rideId={rideId} />
+
+            {["REQUESTED", "ACCEPTED", "DRIVER_ARRIVED"].includes(rideStatus) && (
+              <button
+                onClick={() => setShowCancel(true)}
+                className="flex-1 bg-red-600 text-white py-2 rounded"
+              >
+                Cancel Ride
+              </button>
+            )}
+
           </div>
-        </div>
+        </>
       )}
-
-      {/* LIVE FARE */}
-      {fare && <LiveFare fare={fare} />}
-
-      {/* DRIVER CARD */}
-      {driver && (
-        <div className="bg-white p-3 rounded flex gap-3 items-center">
-          <img src={driver.photo} className="w-12 h-12 rounded-full" />
-          <div>
-            <p className="font-bold">{driver.name}</p>
-            <p className="text-sm text-gray-500">
-              ⭐ {driver.rating} • {driver.vehicleNumber}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* CHAT */}
-      <ChatBox rideId={rideId} userId="client" />
-
-      {/* ACTIONS */}
-      <div className="flex gap-3">
-        <CallButton phone={driver?.phone} />
-        <SOSButton rideId={rideId} />
-
-        {["WAITING", "ASSIGNED", "DRIVER_ARRIVED"].includes(rideStatus) && (
-          <button
-            onClick={() => setShowCancel(true)}
-            className="flex-1 bg-red-600 text-white py-2 rounded"
-          >
-            Cancel Ride
-          </button>
-        )}
-      </div>
 
       {/* CANCEL MODAL */}
       {showCancel && (
@@ -281,34 +283,50 @@ export default function LiveRide() {
         </div>
       )}
 
-      {/* RATING MODAL */}
+      {/* ⭐ ENHANCED RATING MODAL */}
       {showRating && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center">
-          <div className="bg-white p-6 rounded-xl w-full max-w-sm">
-            <h3 className="text-lg font-bold mb-3">Rate your Driver</h3>
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-2xl w-full max-w-sm text-center">
+            <h3 className="text-xl font-bold mb-1">Ride Completed 🎉</h3>
+            <p className="text-gray-500 mb-4">Rate your experience</p>
 
-            <select
-              value={rating}
-              onChange={(e) => setRating(Number(e.target.value))}
-              className="w-full border p-2 rounded mb-3"
-            >
-              {[5, 4, 3, 2, 1].map((r) => (
-                <option key={r} value={r}>{r} ⭐</option>
+            {driver && (
+              <div className="flex flex-col items-center mb-4">
+                <img
+                  src={driver.photo}
+                  className="w-16 h-16 rounded-full mb-2"
+                />
+                <p className="font-semibold">{driver.name}</p>
+              </div>
+            )}
+
+            <div className="flex justify-center gap-2 mb-4">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  onClick={() => setRating(star)}
+                  className={`text-3xl transition ${star <= rating
+                      ? "text-yellow-400 scale-110"
+                      : "text-gray-300"
+                    }`}
+                >
+                  ★
+                </button>
               ))}
-            </select>
+            </div>
 
             <textarea
-              placeholder="Feedback (optional)"
+              placeholder="Write feedback (optional)"
               value={feedback}
               onChange={(e) => setFeedback(e.target.value)}
-              className="w-full border p-2 rounded mb-4"
+              className="w-full border rounded-lg p-3 mb-4"
             />
 
             <button
               onClick={submitRating}
-              className="w-full bg-indigo-600 text-white py-2 rounded"
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-semibold"
             >
-              Submit Rating
+              Submit Rating ⭐
             </button>
           </div>
         </div>
