@@ -88,76 +88,102 @@ export const updateClientProfile = async (req, res) => {
 /* ✅ RATE DRIVER (AFTER RIDE COMPLETED) */
 /* ===================================================== */
 export const rateDriver = async (req, res) => {
-  const { rideId, rating, feedback } = req.body;
+  try {
+    const { rideId, rating, feedback } = req.body;
 
-  if (!rating || rating < 1 || rating > 5) {
-    return res.status(400).json({
+    /* ✅ BASIC VALIDATION */
+    if (!rideId || !rating) {
+      return res.status(400).json({
+        success: false,
+        message: "RideId and rating are required",
+      });
+    }
+
+    if (rating < 1 || rating > 5) {
+      return res.status(400).json({
+        success: false,
+        message: "Rating must be between 1 and 5",
+      });
+    }
+
+    /* ✅ FIND RIDE */
+    const ride = await Ride.findById(rideId);
+    if (!ride) {
+      return res.status(404).json({
+        success: false,
+        message: "Ride not found",
+      });
+    }
+
+    /* ✅ ONLY CLIENT CAN RATE */
+    if (ride.clientId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    /* ✅ RIDE MUST BE COMPLETED */
+    if (ride.status !== "COMPLETED") {
+      return res.status(400).json({
+        success: false,
+        message: "Ride not completed yet",
+      });
+    }
+
+    /* ✅ PREVENT DOUBLE RATING */
+    if (ride.clientRating?.rating) {
+      return res.status(400).json({
+        success: false,
+        message: "Ride already rated",
+      });
+    }
+
+    /* ✅ SAVE RATING IN RIDE (FEEDBACK OPTIONAL) */
+    ride.clientRating = {
+      rating,
+      feedback: feedback?.trim() || "",
+      ratedAt: new Date(),
+    };
+    await ride.save();
+
+    /* ✅ UPDATE DRIVER RATING (NOT CLIENT ❗) */
+    const driver = await User.findById(ride.driverId);
+    if (!driver) {
+      return res.status(404).json({
+        success: false,
+        message: "Driver not found",
+      });
+    }
+
+    const totalRatings = driver.rating?.totalRatings || 0;
+    const avgRating = driver.rating?.average || 0;
+
+    const newTotal = totalRatings + 1;
+    const newAverage =
+      (avgRating * totalRatings + rating) / newTotal;
+
+    driver.rating = {
+      average: Number(newAverage.toFixed(1)),
+      totalRatings: newTotal,
+    };
+
+    await driver.save();
+
+    return res.json({
+      success: true,
+      message: "Rating submitted successfully",
+      data: {
+        driverRating: driver.rating,
+      },
+    });
+
+  } catch (error) {
+    console.error("RATE DRIVER ERROR:", error);
+    return res.status(500).json({
       success: false,
-      message: "Rating must be between 1 and 5",
+      message: "Something went wrong",
     });
   }
-
-  const ride = await Ride.findById(rideId);
-
-  if (!ride) {
-    return res.status(404).json({
-      success: false,
-      message: "Ride not found",
-    });
-  }
-
-  if (ride.clientId.toString() !== req.user._id.toString()) {
-    return res.status(403).json({
-      success: false,
-      message: "Unauthorized",
-    });
-  }
-
-  if (ride.status !== "COMPLETED") {
-    return res.status(400).json({
-      success: false,
-      message: "Ride not completed yet",
-    });
-  }
-
-  if (ride.clientRating?.rating) {
-    return res.status(400).json({
-      success: false,
-      message: "Ride already rated",
-    });
-  }
-
-  /* SAVE RATING IN RIDE */
-  ride.clientRating = {
-    rating,
-    feedback,
-    ratedAt: new Date(),
-  };
-  await ride.save();
-
-  /* UPDATE CLIENT AVERAGE RATING */
-  const user = await User.findById(req.user._id);
-
-  const total = user.rating?.totalRatings || 0;
-  const avg = user.rating?.average || 0;
-
-  const newTotal = total + 1;
-  const newAverage =
-    (avg * total + rating) / newTotal;
-
-  user.rating = {
-    average: Number(newAverage.toFixed(1)),
-    totalRatings: newTotal,
-  };
-
-  await user.save();
-
-  res.json({
-    success: true,
-    message: "Rating submitted successfully",
-    data: {
-      averageRating: user.rating.average,
-      totalRatings: user.rating.totalRatings,
-    },
-  });
 };
+

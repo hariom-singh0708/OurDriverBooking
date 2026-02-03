@@ -83,9 +83,9 @@ export default function LiveRide() {
     };
 
     const onDriverAssigned = (data) => {
-  setDriver(data.driver);
-  setRideStatus("ACCEPTED"); // ✅ CORRECT
-};
+      setDriver(data.driver);
+      setRideStatus("ACCEPTED"); // ✅ CORRECT
+    };
 
 
     const onDriverLocation = ({ lat, lng }) => {
@@ -155,20 +155,34 @@ export default function LiveRide() {
 
   /* ================= SUBMIT RATING ================= */
   const submitRating = async () => {
-    await rateDriver({ rideId, rating, feedback });
-    setShowRating(false);
-    alert("Thanks for rating ⭐");
-    navigate("/client");
+    try {
+      await rateDriver({
+        rideId,
+        rating,
+        feedback: feedback.trim(), // optional
+      });
+
+      alert("Thanks for rating ⭐");
+      setShowRating(false);
+      navigate("/client");
+
+    } catch (err) {
+      alert(
+        err.response?.data?.message ||
+        "Failed to submit rating"
+      );
+    }
   };
+
 
   /* ================= STATUS TEXT ================= */
   const statusText = {
-  REQUESTED: "Looking for nearby driver...",
-  ACCEPTED: "🚕 Driver is coming to pickup",
-  DRIVER_ARRIVED: "Driver arrived. Share OTP",
-  ON_RIDE: "On the way to destination",
-  COMPLETED: "Ride completed",
-};
+    REQUESTED: "Looking for nearby driver...",
+    ACCEPTED: "🚕 Driver is coming to pickup",
+    DRIVER_ARRIVED: "Driver arrived. Share OTP",
+    ON_RIDE: "On the way to destination",
+    COMPLETED: "Ride completed",
+  };
 
 
   /* ================= UI ================= */
@@ -285,29 +299,42 @@ export default function LiveRide() {
 
       {/* ⭐ ENHANCED RATING MODAL */}
       {showRating && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-2xl w-full max-w-sm text-center">
-            <h3 className="text-xl font-bold mb-1">Ride Completed 🎉</h3>
-            <p className="text-gray-500 mb-4">Rate your experience</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-3xl bg-gradient-to-b from-gray-900 to-gray-800 p-6 text-center shadow-2xl border border-white/10">
 
+            {/* HEADER */}
+            <h3 className="text-2xl font-bold text-white mb-1">
+              Ride Completed 🎉
+            </h3>
+            <p className="text-gray-400 mb-5">
+              How was your ride experience?
+            </p>
+
+            {/* DRIVER */}
             {driver && (
-              <div className="flex flex-col items-center mb-4">
+              <div className="flex flex-col items-center mb-6">
                 <img
                   src={driver.photo}
-                  className="w-16 h-16 rounded-full mb-2"
+                  className="w-16 h-16 rounded-full border-2 border-indigo-500 shadow-lg mb-2"
                 />
-                <p className="font-semibold">{driver.name}</p>
+                <p className="text-white font-semibold">
+                  {driver.name}
+                </p>
+                <p className="text-sm text-gray-400">
+                  Your Driver
+                </p>
               </div>
             )}
 
-            <div className="flex justify-center gap-2 mb-4">
+            {/* STARS */}
+            <div className="flex justify-center gap-3 mb-6">
               {[1, 2, 3, 4, 5].map((star) => (
                 <button
                   key={star}
                   onClick={() => setRating(star)}
-                  className={`text-3xl transition ${star <= rating
-                      ? "text-yellow-400 scale-110"
-                      : "text-gray-300"
+                  className={`text-4xl transition-all duration-200 ${star <= rating
+                      ? "text-yellow-400 scale-125 drop-shadow-glow"
+                      : "text-gray-600 hover:text-yellow-300 hover:scale-110"
                     }`}
                 >
                   ★
@@ -315,22 +342,38 @@ export default function LiveRide() {
               ))}
             </div>
 
+            {/* FEEDBACK */}
             <textarea
               placeholder="Write feedback (optional)"
               value={feedback}
               onChange={(e) => setFeedback(e.target.value)}
-              className="w-full border rounded-lg p-3 mb-4"
+              className="w-full resize-none rounded-xl bg-gray-900 border border-gray-700 p-3 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
+              rows={3}
             />
 
+            {/* SUBMIT */}
             <button
               onClick={submitRating}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-semibold"
+              className="w-full mb-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 py-3 text-white font-semibold shadow-lg hover:opacity-90 active:scale-95 transition"
             >
               Submit Rating ⭐
             </button>
+
+            {/* SKIP */}
+            <button
+              onClick={() => {
+                setFeedback("");
+                submitRating();
+              }}
+              className="w-full rounded-xl border border-gray-700 py-2 text-gray-400 hover:text-white hover:border-gray-500 transition"
+            >
+              Skip Feedback
+            </button>
+
           </div>
         </div>
       )}
+
     </div>
   );
 }

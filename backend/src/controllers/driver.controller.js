@@ -58,6 +58,9 @@ export const getDriverAnalytics = async (req, res) => {
 
     const { start, end } = getDateRange(type);
 
+    /* ================= HELPER ================= */
+    const round2 = (num) => Number(num.toFixed(2));
+
     /* ================= RIDES ================= */
 
     const accepted = await Ride.countDocuments({
@@ -99,7 +102,7 @@ export const getDriverAnalytics = async (req, res) => {
       },
     ]);
 
-    const cashCollected = cashAgg[0]?.totalCash || 0;
+    const cashCollected = round2(cashAgg[0]?.totalCash || 0);
 
     /* ================= TOTAL EARNINGS ================= */
 
@@ -119,17 +122,17 @@ export const getDriverAnalytics = async (req, res) => {
       },
     ]);
 
-    const gross = earningsAgg[0]?.total || 0;
-    const driverEarning = gross * 0.5;
+    const gross = round2(earningsAgg[0]?.total || 0);
+    const driverEarning = round2(gross * 0.5);
 
     /* ================= PERFORMANCE ================= */
 
     const acceptanceRate =
-      total > 0 ? ((accepted / total) * 100).toFixed(1) : 0;
+      total > 0 ? round2((accepted / total) * 100) : 0;
 
     /* ================= RESPONSE ================= */
 
-    res.json({
+    return res.json({
       success: true,
       data: {
         period: type,
@@ -142,7 +145,7 @@ export const getDriverAnalytics = async (req, res) => {
         earnings: {
           gross,
           driverEarning,
-          cashCollected, // ✅ IMPORTANT
+          cashCollected,
         },
         performance: {
           acceptanceRate,
@@ -150,13 +153,14 @@ export const getDriverAnalytics = async (req, res) => {
       },
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
+    console.error("DRIVER ANALYTICS ERROR:", err);
+    return res.status(500).json({
       success: false,
       message: "Analytics error",
     });
   }
 };
+
 
 
 

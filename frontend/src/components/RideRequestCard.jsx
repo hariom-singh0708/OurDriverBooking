@@ -30,6 +30,12 @@ export default function RideRequestCard({ ride, onAccept, onReject }) {
           ₹{ride.fareBreakdown.totalFare}
         </span>
       </div>
+      <div className="flex justify-between items-center pt-2 border-t border-gray-800">
+        <span className="text-gray-400 text-sm">Your Earning: </span>
+        <span className="text-xl font-bold text-green-400">
+          ₹{ride.fareBreakdown.totalFare/2}
+        </span>
+      </div>
 
       {/* ACTIONS */}
       <div className="flex gap-3 pt-2">
