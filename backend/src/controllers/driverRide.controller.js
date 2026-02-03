@@ -40,13 +40,20 @@ export const acceptRide = async (req, res) => {
 
   await ride.save();
 
-  const io = getIO();
+const io = getIO();
 
-  // 🔥 REAL-TIME UPDATE TO CLIENT
-  io.to(ride._id.toString()).emit("ride_status_update", {
-    status: "ACCEPTED",
-    otp: ride.otp,
-  });
+io.to(ride._id.toString()).emit("ride_details", {
+  _id: ride._id,
+  pickupLocation: ride.pickupLocation,
+  dropLocation: ride.dropLocation,
+  rideType: ride.rideType,
+  paymentMode: ride.paymentMode,
+  fareBreakdown: ride.fareBreakdown,
+  paymentStatus: ride.paymentStatus,
+  status: ride.status,
+});
+
+
 
   res.json({
     success: true,

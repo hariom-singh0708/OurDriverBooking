@@ -27,4 +27,5 @@ router.post("/location", protect, updateDriverLocation);
 /* ✅ FIXED ANALYTICS ROUTE */
 router.get("/analytics", protect, getDriverAnalytics);
 
+
 export default router;
