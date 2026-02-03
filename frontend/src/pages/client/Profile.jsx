@@ -50,6 +50,14 @@ export default function Profile() {
     setProfile(res.data.data);
   };
 
+  const handleLogout = () => {
+  localStorage.removeItem("token");
+  localStorage.removeItem("user"); // agar user bhi store karte ho
+
+  navigate("/login"); // ya "/" jo tumhara login route ho
+};
+
+
   /* ================= ADD / REMOVE ADDRESS ================= */
   const addAddress = async () => {
     if (!newAddress.trim()) return;
@@ -124,32 +132,43 @@ export default function Profile() {
           </div>
 
           {/* ⭐ RATING + WALLET + INBOX */}
-          <div className="flex items-center gap-4">
-            {/* ⭐ RATING */}
-            <div className="text-right">
-              <p className="text-xs text-gray-400">Rating</p>
-              <p className="text-lg font-bold text-yellow-400">
-                ⭐ {profile.rating?.average || 0}
-                <span className="text-xs text-gray-400 ml-1">
-                  ({profile.rating?.totalRatings || 0})
-                </span>
-              </p>
-            </div>
+          <div className="flex items-center gap-3">
+  {/* ⭐ RATING */}
+  <div className="text-right">
+    <p className="text-xs text-gray-400">Rating</p>
+    <p className="text-lg font-bold text-yellow-400">
+      ⭐ {profile.rating?.average || 0}
+      <span className="text-xs text-gray-400 ml-1">
+        ({profile.rating?.totalRatings || 0})
+      </span>
+    </p>
+  </div>
 
-            <button
-              onClick={() => setShowInbox(true)}
-              className="rounded-xl bg-white/5 border border-white/10 px-4 py-2 text-white hover:bg-white/10"
-            >
-              📥 Inbox
-            </button>
+  {/* 📥 INBOX */}
+  <button
+    onClick={() => setShowInbox(true)}
+    className="rounded-xl bg-white/5 border border-white/10 px-4 py-2 text-white hover:bg-white/10"
+  >
+    📥
+  </button>
 
-            <button
-              onClick={() => setShowWallet(true)}
-              className="rounded-xl bg-white/5 border border-white/10 px-4 py-2 text-white hover:bg-white/10"
-            >
-              💰 Wallet
-            </button>
-          </div>
+  {/* 💰 WALLET */}
+  <button
+    onClick={() => setShowWallet(true)}
+    className="rounded-xl bg-white/5 border border-white/10 px-4 py-2 text-white hover:bg-white/10"
+  >
+    💰
+  </button>
+
+  {/* 🚪 LOGOUT */}
+  <button
+    onClick={handleLogout}
+    className="rounded-xl bg-red-500/10 border border-red-500/30 px-4 py-2 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition"
+  >
+    Logout
+  </button>
+</div>
+
         </div>
 
         {/* ================= BASIC DETAILS ================= */}
