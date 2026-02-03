@@ -3,6 +3,8 @@ import KYC from "../models/KYC.model.js";
 import { getIO } from "../config/socket.js";
 import Ride from "../models/Ride.model.js";
 import Payment from "../models/Payment.model.js";
+import User from "../models/User.model.js";
+import cloudinary from "../config/cloudinary.js";
 
 const getDateRange = (type) => {
   const now = new Date();
@@ -231,4 +233,140 @@ export const getDriverStatus = async (req, res) => {
       isOnline: status?.isOnline || false,
     },
   });
+};
+
+/**
+ * Update Driver Profile (Additional Details)
+ */
+export const updateDriverProfile = async (req, res) => {
+  try {
+    const {
+      carTypes,
+      preferredLanguage,
+      dob,
+      preferredCity,
+      gender,
+    } = req.body;
+
+    const driver = await User.findByIdAndUpdate(
+      req.user._id,
+      {
+        $set: {
+          carTypes,
+          preferredLanguage,
+          dob,
+          preferredCity,
+          gender,
+        },
+      },
+      { new: true }
+    ).select("-password");
+
+    res.json({
+      success: true,
+      message: "Driver profile updated",
+      data: driver,
+    });
+  } catch (err) {
+    console.error("Update driver profile error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Profile update failed",
+    });
+  }
+};
+
+/**
+ * Update Driver Bank Details (FIXED)
+ */
+export const updateDriverBankDetails = async (req, res) => {
+  try {
+    const { bankDetails } = req.body;
+
+    const driver = await User.findByIdAndUpdate(
+      req.user._id,
+      {
+        $set: {
+          bankDetails: {
+            ...bankDetails,
+            isVerifiedByAdmin: false, // ✅ merge inside object
+          },
+        },
+      },
+      { new: true }
+    ).select("-password");
+
+    res.json({
+      success: true,
+      message: "Bank details saved",
+      data: driver.bankDetails,
+    });
+  } catch (err) {
+    console.error("Bank update error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Bank details update failed",
+    });
+  }
+};
+
+
+export const getDriverProfile = async (req, res) => {
+  try {
+    const driver = await User.findById(req.user._id).select("-password");
+
+    if (!driver) {
+      return res.status(404).json({
+        success: false,
+        message: "Driver not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: driver,
+    });
+  } catch (err) {
+    console.error("Get driver profile error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch profile",
+    });
+  }
+};
+
+/**
+ * Update Driver Profile Photo (FIXED)
+ * multer + CloudinaryStorage already uploads image
+ */
+export const updateDriverProfilePhoto = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "No image uploaded",
+      });
+    }
+
+    // ✅ multer-storage-cloudinary already uploaded image
+    const imageUrl = req.file.path; // THIS IS CLOUDINARY URL
+
+    const driver = await User.findByIdAndUpdate(
+      req.user._id,
+      { profileImage: imageUrl },
+      { new: true }
+    ).select("-password");
+
+    res.json({
+      success: true,
+      message: "Driver profile photo updated",
+      data: driver,
+    });
+  } catch (err) {
+    console.error("Driver photo upload error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Profile photo upload failed",
+    });
+  }
 };

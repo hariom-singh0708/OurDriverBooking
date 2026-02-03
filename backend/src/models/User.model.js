@@ -74,6 +74,20 @@ const userSchema = new mongoose.Schema(
       type: String, // instructions for driver
     },
 
+    /* ================= DRIVER ADDITIONAL DETAILS (FIX) ================= */
+
+/* ✅ MULTI VEHICLE TYPES (Manual / Automatic / SUV / Luxury) */
+carTypes: {
+  type: [String],
+  default: [],
+},
+
+/* ✅ CITY WHERE DRIVER PREFERS TO WORK */
+preferredCity: {
+  type: String,
+},
+
+
     /* ================= SAVED ADDRESSES (CLIENT) ================= */
     savedAddresses: [
       {
@@ -109,9 +123,54 @@ const userSchema = new mongoose.Schema(
         default: 0,
       },
     },
+
+
+        /* ================= DRIVER ADDITIONAL DETAILS ================= */
+    drivingExperienceYears: {
+      type: Number,
+      default: 0,
+    },
+
+    vehicleType: {
+      type: String, // Sedan / SUV / Hatchback
+    },
+
+    licenseNumber: {
+      type: String,
+    },
+
+    licenseExpiry: {
+      type: Date,
+    },
+
+    /* ================= DRIVER BANK DETAILS ================= */
+    bankDetails: {
+      accountHolderName: {
+        type: String,
+      },
+      accountNumber: {
+        type: String,
+      },
+      ifscCode: {
+        type: String,
+      },
+      bankName: {
+        type: String,
+      },
+      branchName: {
+        type: String,
+      },
+      isVerifiedByAdmin: {
+        type: Boolean,
+        default: false,
+      },
+    },
+    
+
   },
-  
   { timestamps: true }
 );
 
 export default mongoose.model("User", userSchema);
+
+

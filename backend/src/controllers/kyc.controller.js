@@ -9,6 +9,8 @@ export const submitKYC = async (req, res) => {
     aadhaarNumber: req.body.aadhaarNumber,
     panNumber: req.body.panNumber,
     licenseNumber: req.body.licenseNumber,
+        licenseExpiry: req.body.licenseExpiry || null,
+    criminalOffence: req.body.criminalOffence || "None",
     address: req.body.address,
 
     aadhaarImage: req.files.aadhaarImage?.[0]?.path,

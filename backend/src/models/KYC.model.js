@@ -18,6 +18,17 @@ const kycSchema = new mongoose.Schema(
     licenseNumber: String,
     licenseImage: String,
 
+    /* ✅ NEW */
+    licenseExpiry: {
+      type: Date,
+    },
+
+    /* ✅ NEW */
+    criminalOffence: {
+      type: String,
+      default: "None",
+    },
+
     driverPhoto: String,
     address: String,
 
