@@ -4,9 +4,7 @@ let io;
 
 export const initSocket = (server) => {
   io = new Server(server, {
-    cors: {
-      origin: "*",
-    },
+    cors: { origin: "*" },
   });
 
   io.on("connection", (socket) => {
@@ -14,11 +12,11 @@ export const initSocket = (server) => {
 
     socket.on("join_ride", (rideId) => {
       socket.join(rideId);
-      console.log(`Joined ride room ${rideId}`);
     });
 
-    socket.on("driver_location_update", (data) => {
-      io.to(data.rideId).emit("driver_location_update", data);
+    // ✅ DRIVER → LOCATION
+    socket.on("driver_location", ({ rideId, lat, lng }) => {
+      io.to(rideId).emit("driver_location_update", { lat, lng });
     });
 
     socket.on("ride_status_update", (data) => {

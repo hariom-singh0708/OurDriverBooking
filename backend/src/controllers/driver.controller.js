@@ -205,6 +205,16 @@ export const toggleOnlineStatus = async (req, res) => {
       },
       { upsert: true, new: true }
     );
+   // 🔥 REAL TIME ADMIN UPDATE
+    const io = getIO();
+    if (io) {
+      io.emit("driver_status_updated", {
+        driverId: String(req.user._id),
+        isOnline: status.isOnline,
+        lastSeen: status.lastSeen,
+        location: status.location,
+      });
+    }
 
     return res.json({
       success: true,

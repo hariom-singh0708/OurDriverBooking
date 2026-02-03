@@ -6,12 +6,17 @@ import {
   listRides,
   getRideById,
   toggleDriverBlock,
+  getAdminProfile,
 } from "../controllers/admin.controller.js";
 import { listSOS, resolveSOS } from "../controllers/admin.sos.controller.js";
 import { 
   payWeeklyNow,
   weeklyDriverEarnings,listWeeklyPayouts
 } from "../controllers/admin.payout.controller.js";
+import { getDriverKYC, updateDriverKYC } from "../controllers/admin.kyc.controller.js";
+
+
+
 
 const router = express.Router();
 
@@ -30,8 +35,17 @@ router.get("/rides/:rideId", getRideById);
 // Driver block/unblock (optional but useful)
 router.patch("/drivers/:driverId/block", toggleDriverBlock);
 
+///payouts
 router.get("/payouts", listWeeklyPayouts);
 router.get("/payouts/weekly", weeklyDriverEarnings); 
 router.post("/payouts/weekly/pay", payWeeklyNow);
+
+//kyc
+router.get("/drivers/:driverId/kyc", getDriverKYC);
+router.patch("/drivers/:id/kyc", updateDriverKYC);
+
+//profile
+router.get("/profile", getAdminProfile);
+
 
 export default router;
