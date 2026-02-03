@@ -16,7 +16,7 @@ export default function DriverLiveRide() {
   const [ride, setRide] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sendingLocation, setSendingLocation] = useState(false);
-const [paymentMethod, setPaymentMethod] = useState("UPI");
+  const [paymentMethod, setPaymentMethod] = useState("UPI");
 
   const token = localStorage.getItem("token");
 
@@ -26,10 +26,12 @@ const [paymentMethod, setPaymentMethod] = useState("UPI");
       try {
         const res = await axios.get(
           "http://localhost:5000/rides/driver/active",
-          { headers: { Authorization: `Bearer ${token}` } }
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
         );
         setRide(res.data.data);
-      } catch {
+      } catch (err) {
         setRide(null);
       } finally {
         setLoading(false);
@@ -37,7 +39,7 @@ const [paymentMethod, setPaymentMethod] = useState("UPI");
     };
 
     fetchRide();
-  }, []);
+  }, [token]);
 
   /* ================= SOCKET JOIN ================= */
   useEffect(() => {
@@ -45,29 +47,48 @@ const [paymentMethod, setPaymentMethod] = useState("UPI");
     socket.emit("join_ride", ride._id);
   }, [socket, ride]);
 
-  /* ================= LIVE LOCATION ================= */
+  /* ================= REAL GPS → SOCKET (CORE FEATURE) ================= */
   useEffect(() => {
-    if (!ride?._id) return;
+    if (!socket || !ride?._id) return;
 
-    setSendingLocation(true);
+    socket.on("ride_cancelled", (data) => {
+      alert(`Ride cancelled by client: ${data.reason}`);
+      navigate("/driver");
+    });
 
-    const interval = setInterval(() => {
-      axios.post(
-        "http://localhost:5000/driver/location",
-        {
+    if (!navigator.geolocation) {
+      alert("Geolocation not supported on this device");
+      return;
+    }
+
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+
+        socket.emit("driver_location", {
           rideId: ride._id,
-          lat: 28.6 + Math.random() / 100,
-          lng: 77.2 + Math.random() / 100,
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-    }, 3000);
+          lat: latitude,
+          lng: longitude,
+        });
+
+        setSendingLocation(true);
+      },
+      (error) => {
+        console.error("GPS error:", error);
+        setSendingLocation(false);
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 1000,
+        timeout: 10000,
+      }
+    );
 
     return () => {
-      clearInterval(interval);
+      navigator.geolocation.clearWatch(watchId);
       setSendingLocation(false);
     };
-  }, [ride]);
+  }, [socket, ride]);
 
   /* ================= SOCKET EVENTS ================= */
   useEffect(() => {
@@ -93,38 +114,34 @@ const [paymentMethod, setPaymentMethod] = useState("UPI");
 
   /* ================= PAYMENT ================= */
   const markPaymentReceived = async () => {
-  await axios.post(
-    `http://localhost:5000/rides/${ride._id}/payment-received`,
-    { method: paymentMethod },
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
-
-  setRide((prev) => ({
-    ...prev,
-    paymentStatus: "PAID",
-    paymentMethod,
-  }));
-};
-
-
-  /* ================= COMPLETE RIDE ================= */
- const completeRide = async () => {
-  try {
     await axios.post(
-      `http://localhost:5000/rides/${ride._id}/complete`,
-      {},
+      `http://localhost:5000/rides/${ride._id}/payment-received`,
+      { method: paymentMethod },
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
-    navigate("/driver"); // ✅ instant redirect
-  } catch (err) {
-    alert(
-      err.response?.data?.message ||
-      "Failed to complete ride"
-    );
-  }
-};
+    setRide((prev) => ({
+      ...prev,
+      paymentStatus: "PAID",
+      paymentMethod,
+    }));
+  };
 
+  /* ================= COMPLETE RIDE ================= */
+  const completeRide = async () => {
+    try {
+      await axios.post(
+        `http://localhost:5000/rides/${ride._id}/complete`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      navigate("/driver");
+    } catch (err) {
+      alert(
+        err.response?.data?.message || "Failed to complete ride"
+      );
+    }
+  };
 
   /* ================= UI STATES ================= */
   if (loading) {
@@ -150,17 +167,17 @@ const [paymentMethod, setPaymentMethod] = useState("UPI");
     paymentMode === "pay_after_ride" &&
     paymentStatus !== "PAID";
 
+  /* ================= UI ================= */
   return (
     <div className="min-h-screen bg-gray-900 text-gray-200 p-6 space-y-5">
       <h2 className="text-2xl font-bold">🚗 Live Ride</h2>
 
-      {/* LOCATION */}
+      {/* LOCATION STATUS */}
       <div className="bg-gray-800 p-4 rounded flex justify-between">
         <span>Live Location</span>
         <span
-          className={`font-semibold ${
-            sendingLocation ? "text-green-400" : "text-red-400"
-          }`}
+          className={`font-semibold ${sendingLocation ? "text-green-400" : "text-red-400"
+            }`}
         >
           {sendingLocation ? "Sending" : "Stopped"}
         </span>
@@ -196,55 +213,53 @@ const [paymentMethod, setPaymentMethod] = useState("UPI");
             )}
           </div>
 
-          {/* QR + MARK PAYMENT */}
+          {/* PAY AFTER RIDE */}
           {paymentMode === "pay_after_ride" &&
- paymentStatus === "UNPAID" && (
-  <div className="space-y-4">
+            paymentStatus === "UNPAID" && (
+              <div className="space-y-4">
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setPaymentMethod("UPI")}
+                    className={`flex-1 py-2 rounded ${paymentMethod === "UPI"
+                        ? "bg-blue-600"
+                        : "bg-gray-700"
+                      }`}
+                  >
+                    UPI / QR
+                  </button>
 
-    {/* PAYMENT METHOD SELECT */}
-    <div className="flex gap-3">
-      <button
-        onClick={() => setPaymentMethod("UPI")}
-        className={`flex-1 py-2 rounded ${
-          paymentMethod === "UPI"
-            ? "bg-blue-600"
-            : "bg-gray-700"
-        }`}
-      >
-        UPI / QR
-      </button>
+                  <button
+                    onClick={() => setPaymentMethod("CASH")}
+                    className={`flex-1 py-2 rounded ${paymentMethod === "CASH"
+                        ? "bg-yellow-600"
+                        : "bg-gray-700"
+                      }`}
+                  >
+                    Cash
+                  </button>
+                </div>
 
-      <button
-        onClick={() => setPaymentMethod("CASH")}
-        className={`flex-1 py-2 rounded ${
-          paymentMethod === "CASH"
-            ? "bg-yellow-600"
-            : "bg-gray-700"
-        }`}
-      >
-        Cash
-      </button>
-    </div>
+                {paymentMethod === "UPI" && (
+                  <div className="border border-gray-700 p-3 rounded text-center">
+                    <p className="text-sm mb-2 text-gray-400">
+                      Show this QR to customer
+                    </p>
+                    <img
+                      src={qrImage}
+                      alt="UPI QR"
+                      className="mx-auto w-40"
+                    />
+                  </div>
+                )}
 
-    {/* QR ONLY FOR UPI */}
-    {paymentMethod === "UPI" && (
-      <div className="border border-gray-700 p-3 rounded text-center">
-        <p className="text-sm mb-2 text-gray-400">
-          Show this QR to customer
-        </p>
-        <img src={qrImage} alt="UPI QR" className="mx-auto w-40" />
-      </div>
-    )}
-
-    <button
-      onClick={markPaymentReceived}
-      className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded"
-    >
-      Mark Payment Received
-    </button>
-  </div>
-)}
-
+                <button
+                  onClick={markPaymentReceived}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded"
+                >
+                  Mark Payment Received
+                </button>
+              </div>
+            )}
         </div>
       </div>
 

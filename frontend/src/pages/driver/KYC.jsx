@@ -37,6 +37,17 @@ export default function KYC() {
           <KYCField label="Aadhaar Number" value={mask(kyc.aadhaarNumber)} />
           <KYCField label="PAN Number" value={mask(kyc.panNumber)} />
           <KYCField label="License Number" value={kyc.licenseNumber} />
+
+          {/* ✅ NEW */}
+          <KYCField
+            label="License Expiry Date"
+            value={kyc.licenseExpiry?.slice(0, 10) || "—"}
+          />
+          <KYCField
+            label="Criminal Offence"
+            value={kyc.criminalOffence || "None"}
+          />
+
           <KYCField label="Address" value={kyc.address} />
 
           <div className="grid grid-cols-2 gap-3">
@@ -70,18 +81,49 @@ export default function KYC() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          <input name="aadhaarNumber" placeholder="Aadhaar Number" className="input" />
+          <input
+            name="aadhaarNumber"
+            placeholder="Aadhaar Number"
+            className="input"
+          />
           <input type="file" name="aadhaarImage" />
 
-          <input name="panNumber" placeholder="PAN Number" className="input" />
+          <input
+            name="panNumber"
+            placeholder="PAN Number"
+            className="input"
+          />
           <input type="file" name="panImage" />
 
-          <input name="licenseNumber" placeholder="License Number" className="input" />
+          <input
+            name="licenseNumber"
+            placeholder="License Number"
+            className="input"
+          />
           <input type="file" name="licenseImage" />
+
+          {/* ✅ NEW */}
+          <input
+            type="date"
+            name="licenseExpiry"
+            className="input"
+            placeholder="License Expiry Date"
+          />
+
+          {/* ✅ NEW */}
+          <textarea
+            name="criminalOffence"
+            placeholder="Criminal offence (if any). Write 'None' if not applicable"
+            className="input"
+          />
 
           <input type="file" name="driverPhoto" />
 
-          <textarea name="address" placeholder="Address" className="input" />
+          <textarea
+            name="address"
+            placeholder="Address"
+            className="input"
+          />
 
           <button className="w-full bg-gradient-to-r from-indigo-600 to-cyan-500 py-3 text-white font-bold rounded-xl">
             {loading ? "Submitting..." : "Submit KYC"}

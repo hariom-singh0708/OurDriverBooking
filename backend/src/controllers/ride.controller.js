@@ -53,8 +53,12 @@ export const verifyRideOTP = async (req, res) => {
 
   const io = getIO();
   io.to(ride._id.toString()).emit("ride_status_update", {
-    status: "ON_RIDE",
-  });
+  rideId: ride._id,
+  status: "ON_RIDE",
+  pickupLocation: ride.pickupLocation,
+  dropLocation: ride.dropLocation,
+});
+
 
   res.json({ success: true, message: "OTP verified. Ride started" });
 };
@@ -118,6 +122,14 @@ export const cancelRideByClient = async (req, res) => {
   ride.status = "CANCELLED_BY_CLIENT";
   ride.cancelledAt = new Date();
   await ride.save();
+
+  const io = getIO();
+
+io.to(ride._id.toString()).emit("ride_cancelled", {
+  by: "CLIENT",
+  reason: req.body.reason || "Client cancelled",
+});
+
 
   const user = await User.findById(req.user._id);
   user.cancelCountToday += 1;

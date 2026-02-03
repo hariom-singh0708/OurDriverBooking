@@ -39,3 +39,21 @@ export const rejectRide = (rideId) =>
 /* ✅ FIXED */
 export const getDriverAnalytics = (type) =>
   API.get(`/analytics?type=${type}`);
+
+
+export const getDriverProfile = () =>
+  API.get("/profile");
+
+export const updateDriverProfile = (data) =>
+  API.put("/profile", data);
+
+export const updateDriverBankDetails = (data) =>
+  API.put("/bank-details", data);
+
+// ✅ DRIVER PROFILE PHOTO UPLOAD (NEW)
+export const uploadDriverProfilePhoto = (formData) =>
+  API.put("/profile/photo", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });

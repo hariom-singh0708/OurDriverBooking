@@ -6,7 +6,7 @@ const storage = new CloudinaryStorage({
   cloudinary,
   params: {
     folder: "driver_kyc",
-    allowed_formats: ["jpg", "png", "jpeg", "pdf"],
+    allowed_formats: ["jpg", "png", "jpeg", "pdf","webp"],
   },
 });
 

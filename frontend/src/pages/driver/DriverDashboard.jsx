@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useContext  } from "react";
 import { useNavigate } from "react-router-dom";
-
+import { SocketContext } from "../../context/SocketContext";
 import {
   toggleDriverStatus,
   getRideRequest,
@@ -35,6 +35,7 @@ export default function DriverDashboard() {
 
   const [analytics, setAnalytics] = useState(null);
   const [period, setPeriod] = useState("today");
+const { socket } = useContext(SocketContext);
 
   /* ================= ANALYTICS ================= */
   useEffect(() => {
@@ -95,9 +96,29 @@ export default function DriverDashboard() {
 
   /* ================= ACTIONS ================= */
   const handleAccept = async () => {
-    const res = await acceptRide(ride._id);
-    setRide({ ...ride, status: "ACCEPTED", otp: res.data?.data?.otp });
-  };
+  const res = await acceptRide(ride._id);
+
+  setRide({ 
+    ...ride, 
+    status: "ACCEPTED", 
+    otp: res.data?.data?.otp 
+  });
+
+  // 🔥 JOIN ROOM
+  socket.emit("join_ride", ride._id);
+
+  // 🔥 SEND INITIAL LOCATION IMMEDIATELY
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition((pos) => {
+      socket.emit("driver_location", {
+        rideId: ride._id,
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+      });
+    });
+  }
+};
+
 
   const handleReject = async () => {
     await rejectRide(ride._id);
