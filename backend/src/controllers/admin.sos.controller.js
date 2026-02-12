@@ -1,5 +1,5 @@
 import SOS from "../models/SOS.model.js";
-
+import { sendEmail } from "../utils/sendEmail.js";
 export const listSOS = async (req, res) => {
   const list = await SOS.find()
     .populate("triggeredBy", "name role mobile")

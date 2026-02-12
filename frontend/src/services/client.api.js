@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "http://localhost:5000/client",
+  baseURL: `${import.meta.env.VITE_API_BASE_URL}/client`,
 });
 
 export const getClientProfile = () =>
@@ -26,7 +26,6 @@ export const uploadProfilePhoto = (formData) =>
     },
   });
 
-/* ✅ FIXED ENDPOINT */
 export const updateSavedAddresses = (data) =>
   API.put("/profile/addresses", data, {
     headers: {
@@ -41,9 +40,16 @@ export const updateClientProfile = (data) =>
     },
   });
 
-  /* ================= RATE DRIVER ================= */
 export const rateDriver = (data) =>
   API.post("/rate-driver", data, {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+  });
+
+// ❌ DELETE CLIENT ACCOUNT
+export const deleteClientAccount = () =>
+  API.delete("/account", {
     headers: {
       Authorization: `Bearer ${localStorage.getItem("token")}`,
     },

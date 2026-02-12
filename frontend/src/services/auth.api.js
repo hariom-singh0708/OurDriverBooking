@@ -1,9 +1,8 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "http://localhost:5000/auth",
+  baseURL: `${import.meta.env.VITE_API_BASE_URL}/auth`,
 });
-
 export const signupEmail = (email) =>
   API.post("/signup", { email });
 
@@ -20,7 +19,5 @@ export const getMe = (token) =>
     },
   });
 
-
-  // src/services/auth.api.js
 export const sendLoginOTP = (email) =>
   API.post("/login-otp", { email });

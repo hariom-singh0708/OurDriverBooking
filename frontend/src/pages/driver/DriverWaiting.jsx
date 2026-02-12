@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { markArrived, verifyRideOTP } from "../../services/rideOtp.api";
 import OTPBox from "../../components/OTPBox";
+import toast from "react-hot-toast";
 
 export default function DriverRideStart({ ride }) {
   const [arrived, setArrived] = useState(false);
@@ -12,9 +13,9 @@ export default function DriverRideStart({ ride }) {
       setStarting(true);
       await markArrived(ride._id);
       setArrived(true);
-      alert("✅ Arrived marked. Ask client for OTP.");
+      toast.error("✅ Arrived marked. Ask client for OTP.");
     } catch (err) {
-      alert(
+      toast.error(
         err.response?.data?.message ||
           "Failed to mark arrival"
       );
@@ -29,16 +30,16 @@ export default function DriverRideStart({ ride }) {
       setStarting(true);
 
       if (!otp || otp.length !== 4) {
-        alert("Enter valid 4-digit OTP");
+        toast.error("Enter valid 4-digit OTP");
         return;
       }
 
       await verifyRideOTP(ride._id, otp);
 
-      alert("🚗 Ride Started Successfully");
+      toast.success("🚗 Ride Started Successfully");
       // NEXT: live tracking / waiting / payment flow
     } catch (err) {
-      alert(
+      toast.error(
         err.response?.data?.message ||
           "Invalid OTP"
       );

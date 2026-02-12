@@ -1,9 +1,10 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "http://localhost:5000/kyc",
+  baseURL: `${import.meta.env.VITE_API_BASE_URL}/kyc`,
 });
 
+/* ================= SUBMIT KYC ================= */
 export const submitKYC = (formData) =>
   API.post("/", formData, {
     headers: {
@@ -11,6 +12,7 @@ export const submitKYC = (formData) =>
     },
   });
 
+/* ================= GET KYC STATUS ================= */
 export const getKYCStatus = () =>
   API.get("/", {
     headers: {

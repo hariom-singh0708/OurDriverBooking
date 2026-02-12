@@ -1,9 +1,10 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "http://localhost:5000/history",
+  baseURL: `${import.meta.env.VITE_API_BASE_URL}/history`,
 });
 
+/* ================= CLIENT HISTORY ================= */
 export const getClientHistory = () =>
   API.get("/client", {
     headers: {
@@ -11,6 +12,7 @@ export const getClientHistory = () =>
     },
   });
 
+/* ================= DRIVER HISTORY ================= */
 export const getDriverHistory = () =>
   API.get("/driver", {
     headers: {

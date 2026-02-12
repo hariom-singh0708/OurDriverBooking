@@ -1,9 +1,9 @@
 import { confirmOfflinePayment } from "../services/payment.api";
-
+import toast from "react-hot-toast";
 export default function ConfirmPayment({ rideId }) {
   const confirm = async () => {
     await confirmOfflinePayment(rideId);
-    alert("Payment confirmed. Ride completed.");
+    toast.success("Payment confirmed. Ride completed.");
   };
 
   return (

@@ -1,1 +1,48 @@
 @import "tailwindcss";
+
+/* =========================
+   GLOBAL THEME COLORS
+   ========================= */
+.text-brand {
+  color: #D99233;
+}
+
+.bg-brand {
+  background-color: #D99233;
+}
+
+.border-brand {
+  border-color: #D99233;
+}
+.bg-brand-hover:hover {
+  background-color: #c8842b; /* slightly darker */
+}
+
+.text-brand-hover:hover {
+  color: #c8842b;
+}
+.border-brand-glow {
+  border: 1px solid #D99233;
+  box-shadow: 0 0 2px 4px rgba(217, 146, 51, 0.25);
+}
+
+.text-brand-gradient {
+  background: linear-gradient(90deg, #D99233, #b97824);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.25s ease-in-out;
+}

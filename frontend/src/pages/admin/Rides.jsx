@@ -50,7 +50,8 @@ export default function AdminRides() {
   const cities = useMemo(() => {
     const set = new Set();
     (rows || []).forEach((r) => {
-      const c = r?.city || r?.pickupLocation?.city || r?.dropLocation?.city;
+      const c = r?.preferredCity ||r.driverId?.preferredCity || r?.pickupLocation?.city || r?.dropLocation?.city;
+
       if (c && typeof c === "string") set.add(c.trim());
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b));

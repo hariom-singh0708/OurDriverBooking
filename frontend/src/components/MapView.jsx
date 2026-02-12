@@ -11,19 +11,36 @@ import "leaflet/dist/leaflet.css";
 
 /* ================= ICONS ================= */
 
-// 👤 Human (driver going to pickup)
+// 👤 Driver walking (before pickup)
 const humanIcon = L.icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/3048/3048122.png",
-  iconSize: [32, 32],
+  iconSize: [34, 34],
+  iconAnchor: [17, 34],
 });
 
-// 🚗 Car (ride started)
+// 🚗 Driver car (on ride)
 const carIcon = L.icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/744/744465.png",
-  iconSize: [32, 32],
+  iconSize: [36, 36],
+  iconAnchor: [18, 36],
 });
 
-/* ================= NORMALIZE ================= */
+// 📍 Pickup
+const pickupIcon = L.icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/684/684908.png",
+  iconSize: [38, 38],
+  iconAnchor: [19, 38],
+});
+
+// 🏁 Drop
+const dropIcon = L.icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/252/252025.png",
+  iconSize: [38, 38],
+  iconAnchor: [19, 38],
+});
+
+/* ================= HELPERS ================= */
+
 const normalize = (loc) => {
   if (!loc) return null;
 
@@ -31,7 +48,7 @@ const normalize = (loc) => {
     return { lat: loc.lat, lng: loc.lng };
   }
 
-  if (Array.isArray(loc.coordinates) && loc.coordinates.length === 2) {
+  if (Array.isArray(loc.coordinates)) {
     return {
       lat: loc.coordinates[1],
       lng: loc.coordinates[0],
@@ -42,168 +59,159 @@ const normalize = (loc) => {
 };
 
 /* ================= AUTO CENTER ================= */
+
 function AutoCenter({ position }) {
   const map = useMap();
 
   useEffect(() => {
     if (position) {
-      console.log("🗺️ AutoCenter →", position);
-      map.setView(position, map.getZoom(), { animate: true });
+      map.setView(position, map.getZoom(), {
+        animate: true,
+        duration: 0.5,
+      });
     }
   }, [position, map]);
 
   return null;
 }
 
-/* ================= MAIN ================= */
+/* ================= MAIN COMPONENT ================= */
+
 export default function MapView({
   driverLocation,
   pickup,
   drop,
   rideStatus,
 }) {
+  const [driverPos, setDriverPos] = useState(null);
   const [routeCoords, setRouteCoords] = useState([]);
-  const [smoothDriver, setSmoothDriver] = useState(null);
 
-  const targetLocation = useRef(null);
-  const lastRouteRef = useRef("");
+  const targetRef = useRef(null);
+  const abortRef = useRef(null);
+  const lastKeyRef = useRef("");
 
-  /* ================= DRIVER ICON ================= */
-  const getDriverIcon = () => {
-    if (
-      ["ACCEPTED", "ASSIGNED", "ARRIVED"].includes(rideStatus)
-    ) {
-      return humanIcon;
-    }
-
-    if (rideStatus === "ON_RIDE") {
-      return carIcon;
-    }
-
-    return carIcon;
-  };
-
-  /* ================= INIT / UPDATE DRIVER ================= */
-  useEffect(() => {
-    const d = normalize(driverLocation);
-
-    console.log("📍 RAW driverLocation:", driverLocation);
-    console.log("📍 NORMALIZED driver:", d);
-
-    if (d) {
-      targetLocation.current = d;
-
-      if (!smoothDriver) {
-        console.log("🚗 INIT smoothDriver");
-        setSmoothDriver(d);
-      }
-    }
-  }, [driverLocation]);
-
-  /* ================= SMOOTH DRIVER MOVEMENT ================= */
-  useEffect(() => {
-    if (!smoothDriver || !targetLocation.current) return;
-
-    const interval = setInterval(() => {
-      setSmoothDriver((prev) => {
-        if (!prev) return prev;
-
-        return {
-          lat:
-            prev.lat +
-            (targetLocation.current.lat - prev.lat) * 0.15,
-          lng:
-            prev.lng +
-            (targetLocation.current.lng - prev.lng) * 0.15,
-        };
-      });
-    }, 300);
-
-    return () => clearInterval(interval);
-  }, [smoothDriver]);
-
-  /* ================= ROUTE LOGIC ================= */
-  useEffect(() => {
-    let start, end;
-
-    const driver = normalize(smoothDriver);
-    const pick = normalize(pickup);
-    const dropLoc = normalize(drop);
-
-    console.log("🧭 RIDE STATUS:", rideStatus);
-    console.log("🧭 DRIVER:", driver);
-    console.log("🧭 PICKUP:", pick);
-    console.log("🧭 DROP:", dropLoc);
-
-    // 🚶 Driver → Pickup
-    if (
-      ["ACCEPTED", "ASSIGNED", "ARRIVED"].includes(rideStatus) &&
-      driver &&
-      pick
-    ) {
-      start = driver;
-      end = pick;
-      console.log("➡️ ROUTE: DRIVER → PICKUP");
-    }
-
-    // 🚗 Pickup → Drop
-    if (rideStatus === "ON_RIDE" && pick && dropLoc) {
-      start = pick;
-      end = dropLoc;
-      console.log("➡️ ROUTE: PICKUP → DROP");
-    }
-
-    if (!start || !end) {
-      console.log("❌ Route skipped (start/end missing)");
-      setRouteCoords([]);
-      return;
-    }
-
-    const routeKey = `${start.lat},${start.lng}-${end.lat},${end.lng}`;
-
-    // ⛔ prevent duplicate OSRM calls
-    if (lastRouteRef.current === routeKey) {
-      console.log("⏭️ Route unchanged, skipping OSRM");
-      return;
-    }
-
-    lastRouteRef.current = routeKey;
-
-    const url = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
-
-    console.log("🌐 OSRM URL:", url);
-
-    fetch(url)
-      .then((res) => res.json())
-      .then((data) => {
-        if (!data.routes?.length) {
-          console.log("❌ No route found");
-          setRouteCoords([]);
-          return;
-        }
-
-        const coords = data.routes[0].geometry.coordinates.map(
-          ([lng, lat]) => [lat, lng]
-        );
-
-        console.log("🟣 ROUTE POINTS:", coords.length);
-        setRouteCoords(coords);
-      })
-      .catch((err) => {
-        console.error("❌ OSRM ERROR:", err);
-      });
-  }, [rideStatus, pickup, drop]);
-
-  /* ================= UI ================= */
+  const driver = normalize(driverLocation);
   const pick = normalize(pickup);
   const dropLoc = normalize(drop);
 
+  /* ================= DRIVER ICON ================= */
+
+  const driverIcon =
+    rideStatus === "ON_RIDE" ? carIcon : humanIcon;
+
+  /* ================= INIT DRIVER ================= */
+
+  useEffect(() => {
+    if (driver) {
+      targetRef.current = driver;
+      if (!driverPos) setDriverPos(driver);
+    }
+  }, [driverLocation]);
+
+  /* ================= SMOOTH DRIVER MOVE ================= */
+
+  useEffect(() => {
+    if (!driverPos || !targetRef.current) return;
+
+    const id = setInterval(() => {
+      setDriverPos((prev) => ({
+        lat: prev.lat + (targetRef.current.lat - prev.lat) * 0.2,
+        lng: prev.lng + (targetRef.current.lng - prev.lng) * 0.2,
+      }));
+    }, 300);
+
+    return () => clearInterval(id);
+  }, [driverPos]);
+  
+/* ================= ROUTE FETCH ================= */
+  useEffect(() => {
+  let start = null;
+  let end = null;
+
+  // Determine route direction
+  if (
+    ["ACCEPTED", "ASSIGNED", "ARRIVED"].includes(rideStatus) &&
+    driver &&
+    pick
+  ) {
+    start = driver;
+    end = pick;
+  } else if (rideStatus === "ON_RIDE" && pick && dropLoc) {
+    start = pick;
+    end = dropLoc;
+  }
+
+  // If route not needed
+  if (!start || !end) {
+    setRouteCoords([]);
+    return;
+  }
+
+  // Prevent duplicate route fetch
+  const routeKey = `${start.lat},${start.lng}-${end.lat},${end.lng}`;
+  if (lastKeyRef.current === routeKey) return;
+  lastKeyRef.current = routeKey;
+
+  // Abort previous request
+  if (abortRef.current) {
+    abortRef.current.abort();
+  }
+
+  const controller = new AbortController();
+  abortRef.current = controller;
+
+  const fetchRoute = async () => {
+    try {
+      const url = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
+
+      // Auto timeout after 8 seconds
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+      const res = await fetch(url, { signal: controller.signal });
+
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        throw new Error(`Route request failed (${res.status})`);
+      }
+
+      const data = await res.json();
+
+      if (!data.routes?.length) {
+        setRouteCoords([]);
+        return;
+      }
+
+      const coords = data.routes[0].geometry.coordinates.map(
+        ([lng, lat]) => [lat, lng]
+      );
+
+      setRouteCoords(coords);
+
+    } catch (err) {
+      if (err.name !== "AbortError") {
+        console.warn("Route fetch failed:", err.message);
+        setRouteCoords([]);
+      }
+    }
+  };
+
+  fetchRoute();
+
+  return () => {
+    controller.abort();
+  };
+
+}, [rideStatus, pickup, drop]);
+
+  /* ================= UI ================= */
+
   return (
-    <div className="h-[70vh] w-full">
+    <div className="h-[70vh] w-full rounded-xl overflow-hidden shadow-lg">
       <MapContainer
         center={
-          smoothDriver
-            ? [smoothDriver.lat, smoothDriver.lng]
+          driverPos
+            ? [driverPos.lat, driverPos.lng]
             : pick
             ? [pick.lat, pick.lng]
             : [28.6139, 77.209]
@@ -214,31 +222,51 @@ export default function MapView({
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
         {/* PICKUP */}
-        {pick && <Marker position={[pick.lat, pick.lng]} />}
+        {pick && (
+          <Marker
+            position={[pick.lat, pick.lng]}
+            icon={pickupIcon}
+          />
+        )}
 
         {/* DROP */}
-        {dropLoc && <Marker position={[dropLoc.lat, dropLoc.lng]} />}
+        {dropLoc && (
+          <Marker
+            position={[dropLoc.lat, dropLoc.lng]}
+            icon={dropIcon}
+          />
+        )}
 
         {/* DRIVER */}
-        {smoothDriver && (
+        {driverPos && (
           <>
             <Marker
-              position={[smoothDriver.lat, smoothDriver.lng]}
-              icon={getDriverIcon()}
+              position={[driverPos.lat, driverPos.lng]}
+              icon={driverIcon}
             />
             <AutoCenter
-              position={[smoothDriver.lat, smoothDriver.lng]}
+              position={[driverPos.lat, driverPos.lng]}
             />
           </>
         )}
 
         {/* ROUTE */}
         {routeCoords.length > 0 && (
-          <Polyline
-            positions={routeCoords}
-            color="#4f46e5"
-            weight={5}
-          />
+          <>
+            {/* Glow */}
+            <Polyline
+              positions={routeCoords}
+              color="#6366f1"
+              weight={10}
+              opacity={0.25}
+            />
+            {/* Main line */}
+            <Polyline
+              positions={routeCoords}
+              color="#4f46e5"
+              weight={5}
+            />
+          </>
         )}
       </MapContainer>
     </div>

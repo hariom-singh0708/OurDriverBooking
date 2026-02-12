@@ -1,10 +1,11 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "http://localhost:5000/payment",
+  baseURL: `${import.meta.env.VITE_API_BASE_URL}/payments`,
 });
 
-export const createOrder = (rideId) =>
+/* ================= CREATE ORDER ================= */
+export const createPaymentOrder = (rideId) =>
   API.post(
     "/create-order",
     { rideId },
@@ -15,6 +16,7 @@ export const createOrder = (rideId) =>
     }
   );
 
+/* ================= VERIFY PAYMENT ================= */
 export const verifyPayment = (data) =>
   API.post("/verify", data, {
     headers: {
@@ -22,13 +24,4 @@ export const verifyPayment = (data) =>
     },
   });
 
-export const confirmOfflinePayment = (rideId) =>
-  API.post(
-    "/offline-confirm",
-    { rideId },
-    {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    }
-  );
+

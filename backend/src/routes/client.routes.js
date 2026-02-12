@@ -1,6 +1,6 @@
 import express from "express";
 import { protect } from "../middlewares/auth.middleware.js";
-import multer from "multer";
+import upload from "../middlewares/upload.middleware.js"; // ✅ Cloudinary
 
 import {
   getClientProfile,
@@ -8,11 +8,11 @@ import {
   updateProfilePhoto,
   updateSavedAddresses,
   updateClientProfile,
-  rateDriver, // ✅ NEW IMPORT
+  rateDriver,
+  deleteClientAccount,
 } from "../controllers/client.controller.js";
 
 const router = express.Router();
-const upload = multer({ dest: "uploads/" });
 
 /* ================= GET ================= */
 router.get("/profile", protect, getClientProfile);
@@ -20,33 +20,24 @@ router.get("/rides", protect, getClientRides);
 
 /* ================= UPDATE ================= */
 
-/* ✅ PROFILE PHOTO */
+/* ✅ PROFILE PHOTO (Now Cloudinary) */
 router.put(
   "/profile/photo",
   protect,
-  upload.single("photo"),
+  upload.single("photo"),   // ✅ now uploads to Cloudinary
   updateProfilePhoto
 );
 
 /* ✅ SAVED ADDRESSES */
-router.put(
-  "/profile/addresses",
-  protect,
-  updateSavedAddresses
-);
+router.put("/profile/addresses", protect, updateSavedAddresses);
 
-/* ✅ EXTRA PROFILE DETAILS (NEW) */
-router.put(
-  "/profile",
-  protect,
-  updateClientProfile
-);
+/* ✅ EXTRA PROFILE DETAILS */
+router.put("/profile", protect, updateClientProfile);
+
 /* ✅ RATE DRIVER */
-router.post(
-  "/rate-driver",
-  protect,
-  rateDriver
-);
+router.post("/rate-driver", protect, rateDriver);
 
+// ❌ DELETE CLIENT ACCOUNT
+router.delete("/account", protect, deleteClientAccount);
 
 export default router;

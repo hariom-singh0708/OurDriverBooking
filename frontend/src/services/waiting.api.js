@@ -1,9 +1,10 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "http://localhost:5000/waiting",
+  baseURL: `${import.meta.env.VITE_API_BASE_URL}/waiting`,
 });
 
+/* ================= START WAITING ================= */
 export const startWaiting = (rideId) =>
   API.post(
     "/start",
@@ -15,6 +16,7 @@ export const startWaiting = (rideId) =>
     }
   );
 
+/* ================= END WAITING ================= */
 export const endWaiting = (rideId) =>
   API.post(
     "/end",

@@ -7,21 +7,32 @@ const driverStatusSchema = new mongoose.Schema(
       ref: "User",
       unique: true,
       required: true,
+      index: true,
     },
 
     isOnline: {
       type: Boolean,
       default: false,
+      index: true,
     },
 
     location: {
-      lat: Number,
-      lng: Number,
+      lat: {
+        type: Number,
+        min: -90,
+        max: 90,
+      },
+      lng: {
+        type: Number,
+        min: -180,
+        max: 180,
+      },
     },
 
     lastSeen: {
       type: Date,
       default: Date.now,
+      index: true,
     },
   },
   { timestamps: true }

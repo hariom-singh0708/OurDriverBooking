@@ -1,4 +1,3 @@
-import mongoose from "mongoose";
 import SOS from "../models/SOS.model.js";
 import { getIO } from "../config/socket.js";
 

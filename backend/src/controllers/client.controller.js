@@ -8,17 +8,41 @@ import cloudinary from "../config/cloudinary.js";
 export const getClientProfile = async (req, res) => {
   const user = await User.findById(req.user._id).select("-password");
 
+  // 🔥 REAL-TIME CLIENT RATING (from rides)
+  const ratedRides = await Ride.find({
+    clientId: req.user._id,
+    "clientRating.rating": { $gt: 0 },
+  });
+
+  const totalRatings = ratedRides.length;
+
+  const average =
+    totalRatings === 0
+      ? 0
+      : ratedRides.reduce(
+          (sum, r) => sum + r.clientRating.rating,
+          0
+        ) / totalRatings;
+
   res.json({
     success: true,
-    data: user,
+    data: {
+      ...user.toObject(),
+      rating: {
+        average: Number(average.toFixed(1)),
+        totalRatings,
+      },
+    },
   });
 };
+
 
 /**
  * GET /client/rides
  */
 export const getClientRides = async (req, res) => {
-  const rides = await Ride.find({ clientId: req.user._id });
+  const rides = await Ride.find({ clientId: req.user._id })
+    .sort({ createdAt: -1 }); // 🔥 newest first
 
   res.json({
     success: true,
@@ -30,26 +54,30 @@ export const getClientRides = async (req, res) => {
 /* ✅ ADD: UPDATE PROFILE PHOTO */
 /* ===================================================== */
 export const updateProfilePhoto = async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ message: "No image uploaded" });
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No image uploaded" });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      {
+        profileImage: req.file.path,        // ✅ Cloudinary URL
+        profileImageId: req.file.filename,  // ✅ public_id (important for delete)
+      },
+      { new: true }
+    ).select("-password");
+
+    res.json({
+      success: true,
+      message: "Profile photo updated",
+      data: user,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
-
-  const result = await cloudinary.uploader.upload(req.file.path, {
-    folder: "user_profiles",
-  });
-
-  const user = await User.findByIdAndUpdate(
-    req.user._id,
-    { profileImage: result.secure_url },
-    { new: true }
-  ).select("-password");
-
-  res.json({
-    success: true,
-    message: "Profile photo updated",
-    data: user,
-  });
 };
+
 
 /* ===================================================== */
 /* ✅ ADD: UPDATE SAVED ADDRESSES */
@@ -139,7 +167,7 @@ export const rateDriver = async (req, res) => {
       });
     }
 
-    /* ✅ SAVE RATING IN RIDE (FEEDBACK OPTIONAL) */
+    /* ✅ SAVE RATING IN RIDE */
     ride.clientRating = {
       rating,
       feedback: feedback?.trim() || "",
@@ -147,7 +175,7 @@ export const rateDriver = async (req, res) => {
     };
     await ride.save();
 
-    /* ✅ UPDATE DRIVER RATING (NOT CLIENT ❗) */
+    /* ✅ UPDATE DRIVER RATING (SAFE WAY ❗) */
     const driver = await User.findById(ride.driverId);
     if (!driver) {
       return res.status(404).json({
@@ -163,18 +191,26 @@ export const rateDriver = async (req, res) => {
     const newAverage =
       (avgRating * totalRatings + rating) / newTotal;
 
-    driver.rating = {
-      average: Number(newAverage.toFixed(1)),
-      totalRatings: newTotal,
-    };
-
-    await driver.save();
+    // 🔥 SAFE UPDATE (NO FULL VALIDATION)
+    await User.findByIdAndUpdate(
+      ride.driverId,
+      {
+        $set: {
+          rating: {
+            average: Number(newAverage.toFixed(1)),
+            totalRatings: newTotal,
+          },
+        },
+      },
+      { new: true }
+    );
 
     return res.json({
       success: true,
       message: "Rating submitted successfully",
       data: {
-        driverRating: driver.rating,
+        rating: Number(newAverage.toFixed(1)),
+        totalRatings: newTotal,
       },
     });
 
@@ -187,3 +223,49 @@ export const rateDriver = async (req, res) => {
   }
 };
 
+/* ===================================================== */
+/* ❌ DELETE CLIENT ACCOUNT (WIPE DATA) */
+/* ===================================================== */
+export const deleteClientAccount = async (req, res) => {
+  try {
+    const clientId = req.user._id;
+
+    // 🔐 SAFETY: Block if active ride exists
+    const activeRide = await Ride.findOne({
+      clientId,
+      status: { $in: ["PENDING", "ACCEPTED", "ON_RIDE", "DRIVER_ARRIVED"] },
+    });
+
+    if (activeRide) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot delete account with an active ride",
+      });
+    }
+
+    // ☁️ DELETE PROFILE IMAGE FROM CLOUDINARY (IF EXISTS)
+    const user = await User.findById(clientId);
+
+    if (user?.profileImageId) {
+      try {
+        await cloudinary.uploader.destroy(user.profileImageId);
+      } catch (err) {
+        console.warn("Cloudinary delete failed:", err.message);
+      }
+    }
+
+    // ❌ DELETE USER (CLIENT)
+    await User.findByIdAndDelete(clientId);
+
+    return res.json({
+      success: true,
+      message: "Client account deleted permanently",
+    });
+  } catch (error) {
+    console.error("CLIENT DELETE ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete account",
+    });
+  }
+};

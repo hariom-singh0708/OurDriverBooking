@@ -1,5 +1,5 @@
 import express from "express";
-import { protect } from "../middlewares/auth.middleware.js";
+import { protect, requireRole } from "../middlewares/auth.middleware.js";
 import {
   createRide,
   cancelRideByClient,
@@ -8,41 +8,67 @@ import {
   getDriverActiveRide,
   markPaymentReceived,
   completeRide,
+  getRideById, // 🔥 Move inline logic to controller
+  previewFare,
 } from "../controllers/ride.controller.js";
-import Ride from "../models/Ride.model.js";
-
 
 const router = express.Router();
 
-router.post("/", protect, createRide);
-router.put("/:rideId/cancel", protect, cancelRideByClient);
+/* ================= CLIENT ROUTES ================= */
 
-router.put("/:rideId/arrived", protect, markDriverArrived);
-router.put("/:rideId/verify-otp", protect, verifyRideOTP);
+router.post("/", protect, requireRole("client"), createRide);
+router.post("/preview-fare", protect, previewFare);
+
+router.put(
+  "/:rideId/cancel",
+  protect,
+  requireRole("client"),
+  cancelRideByClient
+);
+
+/* ================= DRIVER ROUTES ================= */
+
 router.get(
   "/driver/active",
   protect,
+  requireRole("driver"),
   getDriverActiveRide
+);
+
+router.put(
+  "/:rideId/arrived",
+  protect,
+  requireRole("driver"),
+  markDriverArrived
+);
+
+router.put(
+  "/:rideId/verify-otp",
+  protect,
+  requireRole("driver"),
+  verifyRideOTP
 );
 
 router.post(
   "/:rideId/payment-received",
   protect,
+  requireRole("driver"),
   markPaymentReceived
 );
 
 router.post(
   "/:rideId/complete",
   protect,
+  requireRole("driver"),
   completeRide
 );
 
-router.get("/:rideId", protect, async (req, res) => {
-  const ride = await Ride.findById(req.params.rideId);
-  if (!ride) return res.status(404).json({ message: "Ride not found" });
+/* ================= COMMON ================= */
 
-  res.json({ success: true, data: ride });
-});
-
+router.get(
+  "/:rideId",
+  protect,
+  getRideById // 🔥 moved to controller
+);
 
 export default router;

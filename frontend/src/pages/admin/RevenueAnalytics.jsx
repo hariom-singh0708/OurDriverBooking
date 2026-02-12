@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import axios from "axios";
-import { TrendingUp, ArrowUpRight, Download } from "lucide-react";
+import { TrendingUp, ArrowUpRight, Download, X } from "lucide-react";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
 function formatINR(n) {
   const num = Number(n || 0);
@@ -41,9 +41,7 @@ function niceBucketLabel(range, key, fallbackLabel) {
 function getRevenueToken() {
   let t = localStorage.getItem("token") || "";
   t = String(t).trim();
-  // remove quotes if token saved like "eyJ..."
   t = t.replace(/^"(.+)"$/, "$1").trim();
-  // remove Bearer if already included
   if (t.toLowerCase().startsWith("bearer ")) t = t.slice(7).trim();
   return t;
 }
@@ -70,73 +68,122 @@ export default function RevenueAnalytics() {
 
   const [series, setSeries] = useState([]); // [{ label, value, key }]
 
-  const fetchAnalytics = async () => {
-    try {
-      setLoading(true);
-      setError("");
+  // ✅ target from env (frontend-only)
+  const targetValue = Number(import.meta.env.VITE_TARGET_VALUE || 0);
+  const achieved = Number(summary.achievedValue ?? summary.totalEarned ?? summary.totalNetRevenue ?? 0);
 
-      // ✅ always read latest token right before request
-      const token = getRevenueToken();
+  const targetPct =
+    targetValue > 0 && Number.isFinite(achieved)
+      ? (achieved / targetValue) * 100
+      : 0;
 
-      if (!token) {
-        setError("Token missing. Please login again.");
-        setSeries([]);
-        setLoading(false);
+  const safePct = Math.max(0, Math.min(100, targetPct));
+
+  // ✅ filter helpers
+  const hasAnyDate = Boolean(filters.from || filters.to);
+
+  const isValidDateRange = useMemo(() => {
+    if (!filters.from && !filters.to) return true; // no filter is valid
+    if (!filters.from || !filters.to) return false; // require both for clarity
+    return filters.from <= filters.to; // YYYY-MM-DD string compare works
+  }, [filters.from, filters.to]);
+
+  const canApply = useMemo(() => {
+    // allow apply if no date filter OR valid from+to
+    if (!hasAnyDate) return true;
+    return Boolean(filters.from && filters.to && isValidDateRange);
+  }, [hasAnyDate, filters.from, filters.to, isValidDateRange]);
+
+  const fetchAnalytics = useCallback(
+    async (overrideFilters) => {
+      const f = overrideFilters || filters;
+
+      // ✅ front-side validation for better UX
+      if ((f.from || f.to) && (!f.from || !f.to)) {
+        setError("Please select both Start and End date, or clear the filter.");
+        return;
+      }
+      if (f.from && f.to && f.from > f.to) {
+        setError("Invalid range: Start date cannot be after End date.");
         return;
       }
 
-      // ✅ quick JWT shape validation
-      if (token.split(".").length !== 3) {
-        setError("Invalid token format. Please logout and login again.");
+      try {
+        setLoading(true);
+        setError("");
+
+        const token = getRevenueToken();
+
+        if (!token) {
+          setError("Token missing. Please login again.");
+          setSeries([]);
+          setLoading(false);
+          return;
+        }
+
+        if (token.split(".").length !== 3) {
+          setError("Invalid token format. Please logout and login again.");
+          setLoading(false);
+          return;
+        }
+
+        const res = await axios.get(`${API_BASE}/admin/analytics/revenue`, {
+          params: {
+            range,
+            from: f.from || undefined,
+            to: f.to || undefined,
+          },
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const data = res?.data || {};
+        const s = data?.summary || {};
+
+        setSummary({
+          totalNetRevenue: s.totalNetRevenue ?? 0,
+          avgRideValue: s.avgRideValue ?? 0,
+          driverCommissions: s.driverCommissions ?? 0,
+          systemProfit: s.systemProfit ?? 0,
+          changePct: s.changePct ?? 0,
+          targetPct: s.targetPct ?? 0,
+          targetValue: s.targetValue ?? 0,
+          from: s.from || null,
+          to: s.to || null,
+          range: s.range || range,
+          achievedValue: s.achievedValue ?? s.totalEarned ?? undefined,
+        });
+
+        setSeries(Array.isArray(data?.series) ? data.series : []);
+      } catch (e) {
+        const msg =
+          e?.response?.data?.message ||
+          (e?.response?.status === 401 ? "Unauthorized. Please login again." : "") ||
+          "Failed to load revenue analytics";
+        setError(msg);
+      } finally {
         setLoading(false);
-        return;
       }
-
-      const res = await axios.get(`${API_BASE}/admin/analytics/revenue`, {
-        params: {
-          range,
-          from: filters.from || undefined,
-          to: filters.to || undefined,
-        },
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const data = res?.data || {};
-      const s = data?.summary || {};
-
-      setSummary({
-        totalNetRevenue: s.totalNetRevenue ?? 0,
-        avgRideValue: s.avgRideValue ?? 0,
-        driverCommissions: s.driverCommissions ?? 0,
-        systemProfit: s.systemProfit ?? 0,
-        changePct: s.changePct ?? 0,
-        targetPct: s.targetPct ?? 0,
-        targetValue: s.targetValue ?? 0,
-        from: s.from || null,
-        to: s.to || null,
-        range: s.range || range,
-      });
-
-      setSeries(Array.isArray(data?.series) ? data.series : []);
-    } catch (e) {
-      const msg =
-        e?.response?.data?.message ||
-        (e?.response?.status === 401 ? "Unauthorized. Please login again." : "") ||
-        "Failed to load revenue analytics";
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [filters, range]
+  );
 
   useEffect(() => {
     fetchAnalytics();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [range]);
+  }, [range, fetchAnalytics]);
 
-  const applyDates = () => fetchAnalytics();
+  const applyDates = () => {
+    // extra guard
+    if (!canApply) return;
+    fetchAnalytics(filters);
+  };
+
+  const clearDates = () => {
+    const cleared = { from: "", to: "" };
+    setFilters(cleared);
+    fetchAnalytics(cleared);
+  };
 
   const bars = useMemo(() => {
     const values = series.map((s) => Number(s.value || 0));
@@ -196,6 +243,11 @@ export default function RevenueAnalytics() {
           </h1>
           <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest mt-2">
             Fiscal Period: <span className="text-stone-900">{fiscalLabel}</span>
+            {filters.from && filters.to ? (
+              <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-stone-100 text-stone-700">
+                <span className="text-[9px] font-black uppercase tracking-widest">Filtered</span>
+              </span>
+            ) : null}
           </p>
         </div>
 
@@ -234,40 +286,63 @@ export default function RevenueAnalytics() {
             </button>
           </div>
 
-          {/* Date Filters */}
+          {/* ✅ Clear + Apply Filters */}
           <div className="flex items-center gap-2 bg-white border border-stone-200 rounded-xl p-2 shadow-sm">
-            <div className="flex flex-col">
-              <span className="text-[9px] font-black uppercase tracking-widest text-stone-400 px-2">
-                Start
-              </span>
-              <input
-                type="date"
-                className="px-2 py-1 text-xs font-bold text-stone-700 outline-none bg-transparent"
-                value={filters.from}
-                onChange={(e) => setFilters((p) => ({ ...p, from: e.target.value }))}
-              />
+            <div className="flex flex-col sm:flex-row sm:items-end gap-2">
+              <div className="flex flex-col">
+                <span className="text-[9px] font-black uppercase tracking-widest text-stone-400 px-2">
+                  Start
+                </span>
+                <input
+                  type="date"
+                  className="px-2 py-1 text-xs font-bold text-stone-700 outline-none bg-transparent"
+                  value={filters.from}
+                  onChange={(e) => setFilters((p) => ({ ...p, from: e.target.value }))}
+                />
+              </div>
+
+              <div className="hidden sm:block h-8 w-px bg-stone-200" />
+
+              <div className="flex flex-col">
+                <span className="text-[9px] font-black uppercase tracking-widest text-stone-400 px-2">
+                  End
+                </span>
+                <input
+                  type="date"
+                  className="px-2 py-1 text-xs font-bold text-stone-700 outline-none bg-transparent"
+                  value={filters.to}
+                  min={filters.from || undefined}
+                  onChange={(e) => setFilters((p) => ({ ...p, to: e.target.value }))}
+                />
+              </div>
             </div>
 
-            <div className="h-8 w-px bg-stone-200" />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={applyDates}
+                disabled={!canApply}
+                className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest active:scale-95 ${
+                  canApply
+                    ? "bg-stone-900 text-white"
+                    : "bg-stone-200 text-stone-500 cursor-not-allowed"
+                }`}
+              >
+                Apply
+              </button>
 
-            <div className="flex flex-col">
-              <span className="text-[9px] font-black uppercase tracking-widest text-stone-400 px-2">
-                End
-              </span>
-              <input
-                type="date"
-                className="px-2 py-1 text-xs font-bold text-stone-700 outline-none bg-transparent"
-                value={filters.to}
-                onChange={(e) => setFilters((p) => ({ ...p, to: e.target.value }))}
-              />
+              <button
+                onClick={clearDates}
+                disabled={!hasAnyDate}
+                className={`p-2 rounded-lg border active:scale-95 ${
+                  hasAnyDate
+                    ? "border-stone-200 text-stone-700 hover:text-[#C05D38]"
+                    : "border-stone-100 text-stone-300 cursor-not-allowed"
+                }`}
+                title="Clear filters"
+              >
+                <X size={16} />
+              </button>
             </div>
-
-            <button
-              onClick={applyDates}
-              className="ml-2 px-3 py-2 rounded-lg bg-stone-900 text-white text-[10px] font-black uppercase tracking-widest active:scale-95"
-            >
-              Apply
-            </button>
           </div>
 
           {/* Download */}
@@ -279,7 +354,7 @@ export default function RevenueAnalytics() {
               ];
               downloadCSV(`revenue_${range}.csv`, rows);
             }}
-            className="p-3 rounded-xl bg-white border border-stone-200 text-stone-600 hover:text-[#C05D38] transition-all shadow-sm"
+            className="p-3 rounded-xl bg-white border border-stone-200 text-stone-600 hover:text-[#C05D38] transition-all shadow-sm w-25"
             title="Download CSV"
           >
             <Download size={18} />
@@ -318,7 +393,11 @@ export default function RevenueAnalytics() {
                   className={changeIsUp ? "text-green-600" : "text-red-600 rotate-90"}
                   size={14}
                 />
-                <span className={`text-[10px] font-black uppercase ${changeIsUp ? "text-green-600" : "text-red-600"}`}>
+                <span
+                  className={`text-[10px] font-black uppercase ${
+                    changeIsUp ? "text-green-600" : "text-red-600"
+                  }`}
+                >
                   {Number(summary.changePct || 0).toFixed(1)}% vs Prev
                 </span>
               </div>
@@ -328,10 +407,13 @@ export default function RevenueAnalytics() {
             <div className="h-[350px] w-full bg-[#F9F6F0]/50 rounded-3xl border border-stone-50 flex items-end p-8 gap-4">
               {bars.length ? (
                 bars.map((b, i) => (
-                  <div key={`${b.key || b.label}_${i}`} className="flex-1 group relative">
+                  <div
+                    key={`${b.key || b.label}_${i}`}
+                    className="flex-1 group relative h-full flex flex-col justify-end"
+                  >
                     <div
                       className="w-full bg-stone-200 group-hover:bg-[#C05D38] transition-all duration-500 rounded-t-lg"
-                      style={{ height: `${b.height}%` }}
+                      style={{ height: `${Math.max(0, Math.min(100, b.height))}%` }}
                       title={`${niceBucketLabel(range, b.key, b.label)}: ${formatINR(b.value)}`}
                     />
                     <div className="absolute -bottom-7 left-1/2 -translate-x-1/2 text-[9px] font-black text-stone-400 uppercase whitespace-nowrap">
@@ -364,22 +446,19 @@ export default function RevenueAnalytics() {
 
             <div>
               <h3 className="text-2xl font-black tracking-tighter">
-                {Number(summary.targetPct || 0) >= 100 ? "Goal Achieved" : "In Progress"}
+                {targetPct >= 100 ? "Goal Achieved" : "In Progress"}
               </h3>
 
               <div className="mt-4 h-2 w-full bg-stone-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-[#C05D38] rounded-full"
-                  style={{ width: `${Math.max(0, Math.min(100, Number(summary.targetPct || 0)))}%` }}
-                />
+                <div className="h-full bg-[#C05D38] rounded-full" style={{ width: `${safePct}%` }} />
               </div>
 
               <div className="flex justify-between mt-2">
                 <span className="text-[9px] font-black uppercase text-stone-500">
-                  {Number(summary.targetPct || 0).toFixed(0)}% of Target
+                  {safePct.toFixed(0)}% of Target
                 </span>
                 <span className="text-[9px] font-black uppercase text-white">
-                  {summary.targetValue ? `${formatINR(summary.targetValue)} Target` : "—"}
+                  {targetValue ? `${formatINR(targetValue)} Target` : "—"}
                 </span>
               </div>
             </div>
@@ -401,11 +480,15 @@ function MetricSmallCard({ label, value, change, isPrimary }) {
   return (
     <div
       className={`p-6 rounded-3xl border shadow-sm transition-all hover:translate-x-2 ${
-        isPrimary ? "bg-white border-[#C05D38]/20 shadow-lg shadow-[#C05D38]/5" : "bg-white border-stone-100"
+        isPrimary
+          ? "bg-white border-[#C05D38]/20 shadow-lg shadow-[#C05D38]/5"
+          : "bg-white border-stone-100"
       }`}
     >
       <div className="flex justify-between items-start">
-        <p className="text-[9px] font-black text-stone-400 uppercase tracking-widest">{label}</p>
+        <p className="text-[9px] font-black text-stone-400 uppercase tracking-widest">
+          {label}
+        </p>
 
         <span
           className={`text-[9px] font-black px-2 py-0.5 rounded-full ${
@@ -420,7 +503,11 @@ function MetricSmallCard({ label, value, change, isPrimary }) {
         </span>
       </div>
 
-      <h4 className={`text-2xl font-black tracking-tighter mt-2 ${isPrimary ? "text-[#C05D38]" : "text-stone-900"}`}>
+      <h4
+        className={`text-2xl font-black tracking-tighter mt-2 ${
+          isPrimary ? "text-[#C05D38]" : "text-stone-900"
+        }`}
+      >
         {value}
       </h4>
     </div>

@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { getAdminStats, getAdminRides } from "../../services/admin.api";
+import {
+  getAdminStats,
+  getAdminRides,
+  toggleSurge,
+  getSurgeStatus
+} from "../../services/admin.api";
 import RevenueAnalytics from "./RevenueAnalytics";
-
 /* ---------------- helpers ---------------- */
 const fmtDateTime = (v) => {
   if (!v) return "—";
@@ -54,6 +58,10 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [rides, setRides] = useState([]);
   const [err, setErr] = useState("");
+  const [surge, setSurge] = useState({
+    peakEnabled: false,
+    festivalEnabled: false,
+  });
 
   const activePct = useMemo(() => {
     const total = Number(stats?.totalRides || 0);
@@ -66,16 +74,34 @@ export default function AdminDashboard() {
     try {
       setLoading(true);
       setErr("");
+
       const s = await getAdminStats();
       const r = await getAdminRides({ limit: 10 });
+      const surgeRes = await getSurgeStatus();
+      setSurge(surgeRes.data);
+
       setStats(s?.data || s);
       setRides(r?.data || []);
+
     } catch (e) {
       setErr(e?.response?.data?.message || e?.message || "Something went wrong");
     } finally {
       setLoading(false);
     }
   };
+
+  const handleToggleSurge = async (type) => {
+    try {
+      await toggleSurge(type);
+      await refresh();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+
+
+
 
   useEffect(() => { refresh(); }, []);
 
@@ -113,9 +139,42 @@ export default function AdminDashboard() {
           </h1>
         </div>
 
-        <button onClick={refresh} className="px-8 py-3 rounded-xl bg-stone-900 text-white font-black uppercase tracking-widest text-[10px] shadow-lg hover:bg-stone-800 transition-all active:scale-95">
-          Refresh Analytics
-        </button>
+        <div className="flex items-center gap-3">
+
+          {/* Peak Button */}
+          <button
+            onClick={() => handleToggleSurge("peak")}
+            className={`px-6 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg transition-all active:scale-95
+      ${surge.peakEnabled
+                ? "bg-green-600 text-white hover:bg-green-700"
+                : "bg-red-500 text-white hover:bg-red-600"
+              }`}
+          >
+            Peak
+          </button>
+
+          {/* Festival Button */}
+          <button
+            onClick={() => handleToggleSurge("festival")}
+            className={`px-6 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg transition-all active:scale-95
+      ${surge.festivalEnabled
+                ? "bg-green-600 text-white hover:bg-green-700"
+                : "bg-red-500 text-white hover:bg-red-600"
+              }`}
+          >
+            Festival
+          </button>
+
+          {/* Original Refresh Button */}
+          <button
+            onClick={refresh}
+            className="px-8 py-3 rounded-xl bg-stone-900 text-white font-black uppercase tracking-widest text-[10px] shadow-lg hover:bg-stone-800 transition-all active:scale-95"
+          >
+            Refresh Analytics
+          </button>
+
+        </div>
+
       </div>
 
       {/* Stats Grid */}
@@ -123,7 +182,7 @@ export default function AdminDashboard() {
         <StatCard label="Total Rides" value={stats?.totalRides} icon="🚗" />
         <StatCard label="Active Rides" value={stats?.activeRides} icon="📍" />
         <StatCard label="Completed Today" value={stats?.completedToday} icon="✨" />
-        
+
         <div className="bg-white border border-stone-100 rounded-3xl p-6 shadow-sm">
           <div className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Active Ratio</div>
           <div className="mt-4 flex items-center gap-4">
@@ -138,19 +197,21 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-<RevenueAnalytics/>
+      <RevenueAnalytics />
 
 
-  
+
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <QuickAction title="Partner Management" desc="Monitor driver performance" href="/admin/drivers" />
         <QuickAction title="Fleet Logs" desc="Complete ride history" href="/admin/rides" />
         <QuickAction title="SOS Monitor" desc="Emergency priority cases" href="/admin/sos" />
+        <QuickAction title="Help & Support" desc="User & client assistance requests" href="/admin/support" />
+        <QuickAction title="Contact Enquiries" desc="Website contact form messages" href="/admin/contact" />
         <QuickAction title="Settlements" desc="Weekly driver payouts" href="/admin/payouts" />
       </div>
 
-    {/* Recent Rides Table */}
+      {/* Recent Rides Table */}
       <div className="bg-white border border-stone-100 rounded-[2rem] shadow-sm overflow-hidden">
         <div className="p-6 border-b border-stone-50 flex items-center justify-between bg-[#F9F6F0]/30">
           <div>
@@ -197,7 +258,6 @@ export default function AdminDashboard() {
           </table>
         </div>
       </div>
-
 
     </div>
   );

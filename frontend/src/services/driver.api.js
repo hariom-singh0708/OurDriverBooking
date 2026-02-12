@@ -2,7 +2,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "http://localhost:5000/driver",
+  baseURL: `${import.meta.env.VITE_API_BASE_URL}/driver`,
 });
 
 /**
@@ -11,13 +11,17 @@ const API = axios.create({
 API.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+
+    if (!token) {
+      return Promise.reject("No token found");
     }
+
+    config.headers.Authorization = `Bearer ${token}`;
     return config;
   },
   (error) => Promise.reject(error)
 );
+
 
 /* ================== DRIVER APIs ================== */
 
@@ -36,10 +40,8 @@ export const acceptRide = (rideId) =>
 export const rejectRide = (rideId) =>
   API.put(`/ride/${rideId}/reject`);
 
-/* ✅ FIXED */
 export const getDriverAnalytics = (type) =>
   API.get(`/analytics?type=${type}`);
-
 
 export const getDriverProfile = () =>
   API.get("/profile");
@@ -50,10 +52,21 @@ export const updateDriverProfile = (data) =>
 export const updateDriverBankDetails = (data) =>
   API.put("/bank-details", data);
 
-// ✅ DRIVER PROFILE PHOTO UPLOAD (NEW)
+// 🆘 DRIVER SUPPORT
+export const sendDriverSupport = (data) =>
+  API.post("/support", data);
+
 export const uploadDriverProfilePhoto = (formData) =>
   API.put("/profile/photo", formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
   });
+
+/* ================== ❌ DANGER ZONE ================== */
+/**
+ * 🗑 Permanently delete driver account
+ * This will wipe profile, bank data, access tokens
+ */
+export const deleteDriverAccount = () =>
+  API.delete("/account");

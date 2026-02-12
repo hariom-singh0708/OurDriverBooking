@@ -1,32 +1,47 @@
-import { createContext, useEffect, useState } from "react";
+import { createContext, useEffect, useState, useCallback } from "react";
 import { getMe } from "../services/auth.api";
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const token = localStorage.getItem("token");
-
-  useEffect(() => {
-    if (token) {
-      getMe(token)
-        .then((res) => setUser(res.data.data))
-        .catch(() => logout());
+  const [user, setUser] = useState(() => {
+    try {
+      const u = localStorage.getItem("user");
+      return u ? JSON.parse(u) : null;
+    } catch {
+      return null;
     }
+  });
+
+  const [token, setToken] = useState(() => localStorage.getItem("token"));
+
+  const logout = useCallback(() => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    setToken(null);
+    setUser(null);
   }, []);
 
-  const login = (token, role) => {
-    localStorage.setItem("token", token);
-    setUser({ role });
-  };
+  // ✅ token change hote hi me fetch hoga
+  useEffect(() => {
+    if (!token) return;
 
-  const logout = () => {
-    localStorage.clear();
-    setUser(null);
+    getMe(token)
+      .then((res) => {
+        setUser(res.data.data);
+        localStorage.setItem("user", JSON.stringify(res.data.data)); // ✅ navbar instantly
+      })
+      .catch(() => logout());
+  }, [token, logout]);
+
+  // ✅ login -> token set -> effect fetches full user
+  const login = (newToken) => {
+    localStorage.setItem("token", newToken);
+    setToken(newToken);
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ token, user, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

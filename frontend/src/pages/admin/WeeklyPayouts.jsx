@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { Calendar, RefreshCw, CreditCard, Users, TrendingUp, CheckCircle, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 
-const API = "http://localhost:5000/admin";
+const API = `${import.meta.env.VITE_API_BASE_URL}/admin`;
 
 const auth = () => ({
   headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -90,16 +91,16 @@ export default function WeeklyPayouts() {
 
   const payThisWeek = async () => {
     if (!startDate || !endDate) {
-      alert("Please select week start date (Monday).");
+      toast.error("Please select week start date (Monday).");
       return;
     }
     if (!rows.length) {
-      alert("No drivers found for this week.");
+      toast.error("No drivers found for this week.");
       return;
     }
     const payableDrivers = rows.filter((d) => Number(d?.payable || 0) > 0);
     if (!payableDrivers.length) {
-      alert("No payable drivers (all have 0 rides).");
+      toast.error("No payable drivers (all have 0 rides).");
       return;
     }
     const ok = window.confirm(
@@ -119,10 +120,10 @@ export default function WeeklyPayouts() {
         },
         auth()
       );
-      alert("✅ Weekly payouts marked as PAID");
+      toast.error("✅ Weekly payouts marked as PAID");
       await load();
     } catch (e) {
-      alert(e?.response?.data?.message || e?.message || "Failed to pay weekly payouts");
+      toast.error(e?.response?.data?.message || e?.message || "Failed to pay weekly payouts");
     } finally {
       setPaying(false);
     }

@@ -5,6 +5,8 @@ import Ride from "../models/Ride.model.js";
 import Payment from "../models/Payment.model.js";
 import User from "../models/User.model.js";
 import cloudinary from "../config/cloudinary.js";
+import Payout from "../models/Payout.model.js";
+import SupportTicket from "../models/SupportTicket.model.js";
 
 const getDateRange = (type) => {
   const now = new Date();
@@ -51,18 +53,16 @@ const getDateRange = (type) => {
 
 
 
+
 export const getDriverAnalytics = async (req, res) => {
   try {
     const driverId = req.user._id;
     const { type = "today" } = req.query;
 
     const { start, end } = getDateRange(type);
-
-    /* ================= HELPER ================= */
-    const round2 = (num) => Number(num.toFixed(2));
+    const round2 = (n) => Number(n.toFixed(2));
 
     /* ================= RIDES ================= */
-
     const accepted = await Ride.countDocuments({
       driverId,
       status: { $in: ["ACCEPTED", "ON_RIDE", "DRIVER_ARRIVED", "COMPLETED"] },
@@ -82,31 +82,23 @@ export const getDriverAnalytics = async (req, res) => {
 
     const total = accepted + rejected;
 
-    /* ================= CASH COLLECTED ================= */
-
+    /* ================= CASH ================= */
     const cashAgg = await Ride.aggregate([
       {
         $match: {
           driverId,
           status: "COMPLETED",
-          paymentStatus: "PAID",
           paymentMethod: "CASH",
           completedAt: { $gte: start, $lte: end },
         },
       },
-      {
-        $group: {
-          _id: null,
-          totalCash: { $sum: "$fareBreakdown.totalFare" },
-        },
-      },
+      { $group: { _id: null, total: { $sum: "$fareBreakdown.totalFare" } } },
     ]);
 
-    const cashCollected = round2(cashAgg[0]?.totalCash || 0);
+    const cashCollected = round2(cashAgg[0]?.total || 0);
 
-    /* ================= TOTAL EARNINGS ================= */
-
-    const earningsAgg = await Ride.aggregate([
+    /* ================= EARNINGS ================= */
+    const earningAgg = await Ride.aggregate([
       {
         $match: {
           driverId,
@@ -114,54 +106,61 @@ export const getDriverAnalytics = async (req, res) => {
           completedAt: { $gte: start, $lte: end },
         },
       },
+      { $group: { _id: null, gross: { $sum: "$fareBreakdown.totalFare" } } },
+    ]);
+
+    const gross = round2(earningAgg[0]?.gross || 0);
+    const driverEarning = round2(gross * 0.5);
+
+    /* ================= PAYOUTS ================= */
+    const payoutAgg = await Payout.aggregate([
+      {
+        $match: {
+          driverId,
+          createdAt: { $gte: start, $lte: end },
+        },
+      },
       {
         $group: {
-          _id: null,
-          total: { $sum: "$fareBreakdown.totalFare" },
+          _id: "$status",
+          amount: { $sum: "$payable" },
         },
       },
     ]);
 
-    const gross = round2(earningsAgg[0]?.total || 0);
-    const driverEarning = round2(gross * 0.5);
+    let receivedPayout = 0;
+    let pendingPayout = 0;
+
+    payoutAgg.forEach((p) => {
+      if (p._id === "PAID") receivedPayout += p.amount;
+      if (["PENDING", "PROCESSING"].includes(p._id))
+        pendingPayout += p.amount;
+    });
 
     /* ================= PERFORMANCE ================= */
-
     const acceptanceRate =
       total > 0 ? round2((accepted / total) * 100) : 0;
-
-    /* ================= RESPONSE ================= */
 
     return res.json({
       success: true,
       data: {
         period: type,
-        rides: {
-          total,
-          accepted,
-          rejected,
-          completed,
-        },
+        rides: { total, accepted, rejected, completed },
         earnings: {
           gross,
           driverEarning,
           cashCollected,
+          receivedPayout: round2(receivedPayout),
+          pendingPayout: round2(pendingPayout),
         },
-        performance: {
-          acceptanceRate,
-        },
+        performance: { acceptanceRate },
       },
     });
   } catch (err) {
     console.error("DRIVER ANALYTICS ERROR:", err);
-    return res.status(500).json({
-      success: false,
-      message: "Analytics error",
-    });
+    res.status(500).json({ success: false, message: "Analytics error" });
   }
 };
-
-
 
 
 export const updateDriverLocation = async (req, res) => {
@@ -336,9 +335,31 @@ export const getDriverProfile = async (req, res) => {
       });
     }
 
+    // 🔥 REAL-TIME DRIVER RATING (FROM RIDES)
+    const ratedRides = await Ride.find({
+      driverId: req.user._id,
+      "clientRating.rating": { $gt: 0 },
+    });
+
+    const totalRatings = ratedRides.length;
+
+    const average =
+      totalRatings === 0
+        ? 0
+        : ratedRides.reduce(
+            (sum, r) => sum + r.clientRating.rating,
+            0
+          ) / totalRatings;
+
     res.json({
       success: true,
-      data: driver,
+      data: {
+        ...driver.toObject(),
+        rating: {
+          average: Number(average.toFixed(1)),
+          totalRatings,
+        },
+      },
     });
   } catch (err) {
     console.error("Get driver profile error:", err);
@@ -381,6 +402,95 @@ export const updateDriverProfilePhoto = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Profile photo upload failed",
+    });
+  }
+};
+
+/**
+ * 🆘 Driver Support / Help Ticket
+ */
+export const createDriverSupportTicket = async (req, res) => {
+  try {
+    const { category, message } = req.body;
+
+    if (!category || !message) {
+      return res.status(400).json({
+        success: false,
+        message: "Category and message are required",
+      });
+    }
+
+    const ticket = await SupportTicket.create({
+      userId: req.user._id,
+      role: "driver",
+      category,
+      message,
+    });
+
+    res.json({
+      success: true,
+      message: "Support request sent to admin",
+      data: ticket,
+    });
+  } catch (err) {
+    console.error("SUPPORT TICKET ERROR:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to send support request",
+    });
+  }
+};
+
+
+/**
+ * ❌ DELETE DRIVER ACCOUNT (PERMANENT)
+ * - Deletes driver user
+ * - Cleans linked collections
+ */
+export const deleteDriverAccount = async (req, res) => {
+  try {
+    const driverId = req.user._id;
+
+    // 🔥 SAFETY: Driver should not be on active ride
+    const activeRide = await Ride.findOne({
+      driverId,
+      status: { $in: ["ACCEPTED", "ON_RIDE", "DRIVER_ARRIVED"] },
+    });
+
+    if (activeRide) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot delete account while an active ride exists",
+      });
+    }
+
+    /* ================= CLEANUP ================= */
+
+    // Driver online status
+    await DriverStatus.deleteOne({ driverId });
+
+    // KYC
+    await KYC.deleteOne({ userId: driverId });
+
+    // Support tickets
+    await SupportTicket.deleteMany({ userId: driverId });
+
+    // ❗ IMPORTANT:
+    // Rides & Payouts are NOT deleted (legal + audit reasons)
+    // They remain linked historically
+
+    // Finally delete user
+    await User.findByIdAndDelete(driverId);
+
+    return res.json({
+      success: true,
+      message: "Driver account permanently deleted",
+    });
+  } catch (err) {
+    console.error("DELETE DRIVER ACCOUNT ERROR:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete driver account",
     });
   }
 };

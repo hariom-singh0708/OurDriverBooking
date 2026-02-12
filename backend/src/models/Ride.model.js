@@ -6,34 +6,38 @@ const rideSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
+      index: true,
     },
 
     driverId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       default: null,
+      index: true,
     },
 
     bookingType: {
       type: String,
       enum: ["distance_based", "time_based"],
       required: true,
+      index: true,
     },
 
     bookingDuration: {
-      type: Number, // hours (only for time-based)
+      type: Number,
+      min: 1,
     },
 
     pickupLocation: {
-      address: String,
-      lat: Number,
-      lng: Number,
+      address: { type: String, trim: true },
+      lat: { type: Number },
+      lng: { type: Number },
     },
 
     dropLocation: {
-      address: String,
-      lat: Number,
-      lng: Number,
+      address: { type: String, trim: true },
+      lat: { type: Number },
+      lng: { type: Number },
     },
 
     rideType: {
@@ -43,16 +47,17 @@ const rideSchema = new mongoose.Schema(
     },
 
     waitingTime: {
-      type: Number, // minutes
+      type: Number,
       default: 0,
+      min: 0,
     },
 
     fareBreakdown: {
-      baseFare: Number,
-      distanceFare: Number,
-      timeFare: Number,
-      waitingCharge: Number,
-      totalFare: Number,
+      baseFare: { type: Number, min: 0 },
+      distanceFare: { type: Number, min: 0 },
+      timeFare: { type: Number, min: 0 },
+      waitingCharge: { type: Number, min: 0 },
+      totalFare: { type: Number, min: 0 },
     },
 
     paymentMode: {
@@ -62,11 +67,11 @@ const rideSchema = new mongoose.Schema(
     },
 
     assignedAt: Date,
-
     requestExpiresAt: Date,
 
     otp: {
       type: String,
+      select: false, // 🔥 hide OTP by default
     },
 
     otpVerified: {
@@ -74,59 +79,75 @@ const rideSchema = new mongoose.Schema(
       default: false,
     },
 
-    completedAt: {
-      type: Date,
-    },
+    completedAt: Date,
 
     finalFareLocked: {
       type: Boolean,
       default: false,
     },
 
-
-
     status: {
       type: String,
       enum: [
         "REQUESTED",
         "ACCEPTED",
-        "DRIVER_ARRIVED",   // ✅ ADD THIS
+        "DRIVER_ARRIVED",
         "ON_RIDE",
         "COMPLETED",
         "CANCELLED_BY_CLIENT",
-        "CANCELLED_BY_DRIVER"
+        "CANCELLED_BY_DRIVER",
+        "CANCELLED_AUTO",
       ],
-      default: "REQUESTED"
+      default: "REQUESTED",
+      index: true,
     },
-
-    
 
     paymentStatus: {
       type: String,
       enum: ["UNPAID", "PAID"],
       default: "UNPAID",
+      index: true,
     },
 
     paymentMethod: {
-  type: String,
-  enum: ["UPI", "CASH"],
-},
-
+      type: String,
+      enum: ["UPI", "CASH", "ONLINE"],
+    },
 
     paymentReceivedAt: Date,
-rejectedByDrivers: [
-  {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-  },
-],
 
-
-
+    rejectedByDrivers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
 
     cancelledAt: Date,
+
+    clientRating: {
+      rating: {
+        type: Number,
+        min: 1,
+        max: 5,
+      },
+      feedback: {
+        type: String,
+        default: "",
+        maxlength: 500,
+      },
+      ratedAt: Date,
+    },
   },
   { timestamps: true }
 );
+
+/* ================= PERFORMANCE INDEXES ================= */
+
+// Most common queries
+rideSchema.index({ clientId: 1, createdAt: -1 });
+rideSchema.index({ driverId: 1, createdAt: -1 });
+rideSchema.index({ status: 1, createdAt: -1 });
+rideSchema.index({ requestExpiresAt: 1 });
 
 export default mongoose.model("Ride", rideSchema);

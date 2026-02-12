@@ -1,4 +1,5 @@
 import express from "express";
+import { toggleSurge, getSurgeStatus } from "../controllers/admin.controller.js";
 import {protect, requireRole } from "../middlewares/auth.middleware.js";
 import {
   getAdminStats,
@@ -17,9 +18,19 @@ import { getDriverKYC, updateDriverKYC } from "../controllers/admin.kyc.controll
 import { getRevenueAnalytics } from "../controllers/adminAnalytics.controller.js";
 
 
+import {
+  listSupportTickets,
+  resolveSupportTicket,
+} from "../controllers/adminSupport.controller.js";
+
+
 
 
 const router = express.Router();
+
+router.post("/toggle-surge", toggleSurge);
+router.get("/surge-status", getSurgeStatus);
+
 
 // ✅ all admin endpoints protected
 router.use(protect, requireRole("admin"));
@@ -51,5 +62,8 @@ router.get("/profile", getAdminProfile);
 //analytics
 router.get("/analytics/revenue", getRevenueAnalytics);
 
+
+router.get("/support", listSupportTickets);
+router.patch("/support/:id/resolve", resolveSupportTicket);
 
 export default router;

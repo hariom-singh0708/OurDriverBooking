@@ -3,7 +3,7 @@ import axios from "axios";
 import { RefreshCw, CreditCard, Calendar, CheckCircle, Clock, ChevronLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-const API = "http://localhost:5000/admin";
+const API = `${import.meta.env.VITE_API_BASE_URL}/admin`;
 
 const auth = () => ({
   headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },

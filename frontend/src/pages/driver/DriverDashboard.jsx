@@ -1,24 +1,28 @@
-import { useEffect, useState, useContext  } from "react";
+import { useEffect, useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
+
 import { SocketContext } from "../../context/SocketContext";
+import { ActiveRideContext } from "../../context/ActiveRideContext";
+import toast from "react-hot-toast";
+
 import {
   toggleDriverStatus,
   getRideRequest,
   acceptRide,
   rejectRide,
-  getDriverStatus,
   getDriverAnalytics,
 } from "../../services/driver.api";
 
 import { getKYCStatus } from "../../services/kyc.api";
 import RideRequestCard from "../../components/RideRequestCard";
 import DriverRideStart from "./DriverRideStart";
+import { DriverStatusContext } from "../../context/DriverStatusContext";
 
-/* ===== Small Stat Card ===== */
-const StatCard = ({ title, value, color = "text-white" }) => (
-  <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-    <p className="text-sm text-slate-400">{title}</p>
-    <p className={`text-2xl font-bold mt-1 ${color}`}>
+/* ===== Refined Stat Card ===== */
+const StatCard = ({ title, value, color = "text-slate-800" }) => (
+  <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
+    <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400">{title}</p>
+    <p className={`text-xl md:text-2xl font-black mt-1 ${color}`}>
       {value ?? "--"}
     </p>
   </div>
@@ -26,45 +30,102 @@ const StatCard = ({ title, value, color = "text-white" }) => (
 
 export default function DriverDashboard() {
   const navigate = useNavigate();
+  const { socket } = useContext(SocketContext);
+  const { activeRide, setActiveRide } = useContext(ActiveRideContext);
+  const [rideRequests, setRideRequests] = useState([]);
 
-  const [online, setOnline] = useState(null);
-  const [ride, setRide] = useState(null);
-  const [kycStatus, setKycStatus] = useState(null);
+  const { driverOnline: online, setDriverOnline: setOnline } =
+    useContext(DriverStatusContext); const [kycStatus, setKycStatus] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const [analytics, setAnalytics] = useState(null);
   const [period, setPeriod] = useState("today");
-const { socket } = useContext(SocketContext);
 
-  /* ================= ANALYTICS ================= */
+
+  /* Logic preserved exactly as per original code... */
   useEffect(() => {
-    getDriverAnalytics(period).then((res) =>
-      setAnalytics(res.data.data)
-    );
+    getDriverAnalytics(period).then((res) => setAnalytics(res.data.data));
   }, [period]);
 
-  /* ================= KYC ================= */
   useEffect(() => {
-    getKYCStatus().then((res) =>
-      setKycStatus(res.data.data?.status)
+    getKYCStatus().then((res) => setKycStatus(res.data.data?.status));
+  }, []);
+
+  /* ================= SOCKET ONLINE / OFFLINE ================= */
+  useEffect(() => {
+    if (!socket || online === null) return;
+
+    if (online === true) socket.emit("driver_online");
+    if (online === false) socket.emit("driver_offline");
+  }, [online, socket]);
+
+  /* ================= SOCKET RIDE EVENTS ================= */
+ useEffect(() => {
+  if (!socket) return;
+
+  const onNewRide = (ride) => {
+    setRideRequests((prev) => {
+      if (prev.find((r) => r._id === ride._id)) return prev;
+      return [...prev, ride];
+    });
+  };
+
+  const onRideTaken = ({ rideId }) => {
+    setRideRequests((prev) =>
+      prev.filter((r) => r._id !== rideId)
     );
-  }, []);
+  };
 
-  /* ================= DRIVER STATUS ================= */
+  const onRideCancelled = ({ rideId }) => {
+    setRideRequests((prev) =>
+      prev.filter((r) => r._id !== rideId)
+    );
+
+    // agar driver accepted ride pe tha
+    if (activeRide?._id === rideId) {
+      setActiveRide(null);
+      navigate("/driver");
+    }
+
+    toast.error("Ride cancelled");
+  };
+
+  socket.on("new_ride", onNewRide);
+  socket.on("ride_taken", onRideTaken);
+  socket.on("ride_cancelled", onRideCancelled);
+
+  return () => {
+    socket.off("new_ride", onNewRide);
+    socket.off("ride_taken", onRideTaken);
+    socket.off("ride_cancelled", onRideCancelled);
+  };
+}, [socket, activeRide, navigate]);
+
+
+  /* ================= POLL RIDES (FALLBACK) ================= */
   useEffect(() => {
-    const loadStatus = async () => {
-      try {
-        const res = await getDriverStatus();
-        setOnline(res.data.data.isOnline);
-      } catch {
-        setOnline(false);
-      }
-    };
-    loadStatus();
-  }, []);
+    if (online !== true || activeRide) return;
 
-  /* ================= TOGGLE ================= */
+    const interval = setInterval(async () => {
+      try {
+        const res = await getRideRequest();
+        if (res.data.data && res.data.data.status === "REQUESTED") {
+          setRideRequests((prev) => {
+            if (prev.find((r) => r._id === res.data.data._id)) return prev;
+            return [...prev, res.data.data];
+          });
+        }
+
+      } catch (err) {
+        console.error("Ride polling failed:", err);
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [online, activeRide, setActiveRide]);
+
+  /* ================= TOGGLE ONLINE ================= */
   const toggleStatus = async () => {
     setError("");
     try {
@@ -82,94 +143,188 @@ const { socket } = useContext(SocketContext);
     }
   };
 
-  /* ================= POLL RIDES ================= */
-  useEffect(() => {
-    if (online !== true || ride) return;
-
-    const interval = setInterval(async () => {
-      const res = await getRideRequest();
-      if (res.data.data) setRide(res.data.data);
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [online, ride]);
-
   /* ================= ACTIONS ================= */
-  const handleAccept = async () => {
-  const res = await acceptRide(ride._id);
+  // const handleAccept = async (ride) => {
+  //   try {
+  //     const res = await acceptRide(ride._id);
 
-  setRide({ 
-    ...ride, 
-    status: "ACCEPTED", 
-    otp: res.data?.data?.otp 
-  });
+  //     const updatedRide = {
+  //       ...ride,
+  //       status: "ACCEPTED",
+  //       otp: res.data?.data?.otp,
+  //     };
 
-  // 🔥 JOIN ROOM
-  socket.emit("join_ride", ride._id);
+  //     setActiveRide(updatedRide); // keep existing behaviour
 
-  // 🔥 SEND INITIAL LOCATION IMMEDIATELY
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition((pos) => {
-      socket.emit("driver_location", {
-        rideId: ride._id,
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-      });
-    });
+  //     // remove from list
+  //     setRideRequests((prev) =>
+  //       prev.filter((r) => r._id !== ride._id)
+  //     );
+
+  //     socket.emit("join_ride", ride._id);
+
+  //     navigate(`/driver/start/${ride._id}`);
+  //   } catch (err) {
+  //     if (err.response?.status === 409) {
+  //       setRideRequests((prev) =>
+  //         prev.filter((r) => r._id !== ride._id)
+  //       );
+  //       alert("❌ Ride already taken by another driver");
+  //       return;
+  //     }
+
+  //     alert(err.response?.data?.message || "Failed to accept ride");
+  //   }
+  // };
+
+
+  const handleAccept = async (ride) => {
+  try {
+    const res = await acceptRide(ride._id);
+
+    // 🔥 Use backend populated ride
+    setActiveRide(res.data.data);
+
+    setRideRequests((prev) =>
+      prev.filter((r) => r._id !== ride._id)
+    );
+
+    socket.emit("join_ride", ride._id);
+
+    navigate(`/driver/start/${ride._id}`);
+  } catch (err) {
+    if (err.response?.status === 409) {
+      setRideRequests((prev) =>
+        prev.filter((r) => r._id !== ride._id)
+      );
+      alert("❌ Ride already taken by another driver");
+      return;
+    }
+
+    alert(err.response?.data?.message || "Failed to accept ride");
   }
 };
 
 
-  const handleReject = async () => {
+
+  const handleReject = async (ride) => {
     await rejectRide(ride._id);
-    setRide(null);
+    setRideRequests((prev) =>
+      prev.filter((r) => r._id !== ride._id)
+    );
   };
 
+
+  /* ================= UI ================= */
   return (
-    <div className="min-h-screen bg-gradient-to-b from-black to-slate-950 text-white p-4 md:p-6">
+    <div className="min-h-screen bg-[#F8FAFC] p-4 md:p-8">
       <div className="max-w-5xl mx-auto space-y-6">
 
-        {/* HEADER */}
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">🚖 Driver Dashboard</h1>
+        {/* 1. TOP STATUS CONTROL */}
+        <div className="bg-white border border-slate-200 rounded-[2rem] p-4 md:p-6 shadow-xl shadow-slate-200/50 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className={`h-12 w-12 rounded-2xl flex items-center justify-center text-xl shadow-inner ${online ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+              {online ? "📡" : "💤"}
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 leading-none mb-1">Current Status</p>
+              <h2 className={`text-xl font-black ${online ? 'text-green-600' : 'text-red-600'}`}>
+                {online === null ? "Loading..." : online ? "You are Online" : "You are Offline"}
+              </h2>
+            </div>
+          </div>
 
           <button
+            disabled={loading || online === null || kycStatus !== "approved"}
+            onClick={toggleStatus}
+            className={`w-full md:w-auto h-14 px-10 rounded-2xl font-black uppercase tracking-widest text-xs transition-all active:scale-95 shadow-lg
+              ${online
+                ? "bg-slate-100 text-slate-600 hover:bg-slate-200 shadow-slate-200"
+                : "bg-brand text-white hover:bg-brand shadow-[#D27D56]/30"
+              } disabled:opacity-50`}
+          >
+            {loading ? "Syncing..." : online ? "Go Offline" : "Go Online"}
+          </button>
+        </div>
+
+        {/* 2. DASHBOARD HEADER & HISTORY */}
+        <div className="flex items-end justify-between px-2">
+          <div>
+            <h1 className="text-3xl font-black text-[#a8663dc7] tracking-tight">Dashboard</h1>
+            <p className="text-sm text-slate-500">Welcome back, Captain</p>
+          </div>
+          <button
             onClick={() => navigate("/driver/history")}
-            className="text-sm text-slate-400 hover:text-white"
+            className="h-10 px-4 rounded-xl border border-slate-200 text-[10px] font-bold uppercase tracking-widest text-slate-600 bg-white hover:bg-slate-50 transition-colors"
           >
             Ride History →
           </button>
         </div>
 
-        {/* KYC WARNING */}
+        {/* 3. KYC WARNING */}
         {kycStatus !== "approved" && (
-          <div className="bg-yellow-900/30 border border-yellow-700 rounded-xl p-4 flex justify-between items-center">
-            <div>
-              <p className="font-medium text-yellow-400">
-                KYC Pending
-              </p>
-              <p className="text-sm text-yellow-300">
-                Complete KYC to receive rides
-              </p>
+          <div className="bg-amber-50 border border-amber-200 rounded-3xl p-5 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div className="flex items-center gap-4">
+              <span className="text-2xl">⚠️</span>
+              <div>
+                <p className="font-bold text-amber-800">KYC Verification Pending</p>
+                <p className="text-xs text-amber-700">Complete your profile to start receiving rides.</p>
+              </div>
             </div>
             <button
               onClick={() => navigate("/driver/kyc")}
-              className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg text-sm"
+              className="w-full sm:w-auto px-6 py-3 bg-amber-600 hover:bg-amber-700 rounded-xl text-white text-[10px] font-bold uppercase tracking-widest"
             >
-              Complete KYC
+              Start KYC
             </button>
           </div>
         )}
 
-        {/* ANALYTICS */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-slate-400 text-sm">Performance</p>
 
+        {/* 5. ACTIVE WORKFLOW (Ride Request / Ongoing Ride) */}
+        <div className="relative">
+          {error && (
+            <div className="bg-red-50 border border-red-100 text-red-600 p-4 rounded-2xl text-xs font-bold text-center animate-shake">
+              {error}
+            </div>
+          )}
+
+          {rideRequests.length > 0 && (
+            <div className="space-y-6">
+              {rideRequests.map((ride) => (
+                <div key={ride._id} className="animate-in zoom-in duration-300">
+                  <RideRequestCard
+                    ride={ride}
+                    onAccept={() => handleAccept(ride)}
+                    onReject={() => handleReject(ride)}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+
+          {!activeRide && online && (
+            <div className="py-20 flex flex-col items-center justify-center space-y-4">
+              <div className="relative">
+                <div className="absolute inset-0 bg-brand/20 rounded-full animate-ping"></div>
+                <div className="relative bg-white p-6 rounded-full shadow-lg text-2xl">📡</div>
+              </div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-slate-400">
+                Scanning for Rides...
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* 4. PERFORMANCE ANALYTICS */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between px-2">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-brand">Performance Overview</p>
             <select
               value={period}
               onChange={(e) => setPeriod(e.target.value)}
-              className="bg-slate-900 border border-slate-700 text-sm rounded-lg px-3 py-1"
+              className="bg-white border border-slate-200 text-[10px] font-bold uppercase rounded-xl px-4 py-2 outline-none focus:ring-2 ring-[#D27D56]/20"
             >
               <option value="today">Today</option>
               <option value="week">This Week</option>
@@ -177,83 +332,18 @@ const { socket } = useContext(SocketContext);
             </select>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
             <StatCard title="Accepted" value={analytics?.rides.accepted} />
-            <StatCard
-              title="Rejected"
-              value={analytics?.rides.rejected}
-              color="text-red-400"
-            />
-            <StatCard
-              title="Completed"
-              value={analytics?.rides.completed}
-              color="text-green-400"
-            />
-            <StatCard
-              title="Earnings ₹"
-              value={analytics?.earnings.driverEarning}
-              color="text-emerald-400"
-            />
-
-            <StatCard
-              title="Cash Collected ₹"
-              value={`-₹${analytics?.earnings.cashCollected ?? 0}`}
-              color="text-yellow-400"
-            />
-
+            <StatCard title="Rejected" value={analytics?.rides.rejected} color="text-red-400" />
+            <StatCard title="Completed" value={analytics?.rides.completed} color="text-green-400" />
+            <StatCard title="Total Earnings ₹" value={analytics?.earnings.driverEarning} color="text-emerald-400" />
+            <StatCard title="Cash Collected ₹" value={`-₹${analytics?.earnings.cashCollected ?? 0}`} color="text-yellow-400" />
+            <StatCard title="Received Payout ₹" value={`₹${analytics?.earnings.receivedPayout ?? 0}`} color="text-yellow-400" />
+            <StatCard title="Pending Payout ₹" value={`₹${analytics?.earnings.pendingPayout ?? 0}`} color="text-yellow-400" />
           </div>
         </div>
 
-        {/* STATUS CARD */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex items-center justify-between">
-          <div>
-            <p className="text-sm text-slate-400">Current Status</p>
-            <span
-              className={`inline-block mt-1 px-3 py-1 rounded-full text-sm font-medium
-                ${online
-                  ? "bg-green-500/20 text-green-400"
-                  : "bg-red-500/20 text-red-400"
-                }`}
-            >
-              {online === null ? "Checking..." : online ? "Online" : "Offline"}
-            </span>
-          </div>
 
-          <button
-            disabled={loading || online === null || kycStatus !== "approved"}
-            onClick={toggleStatus}
-            className={`h-11 px-6 rounded-full font-medium transition
-              ${online
-                ? "bg-red-600 hover:bg-red-700"
-                : "bg-green-600 hover:bg-green-700"
-              }
-              disabled:opacity-50
-            `}
-          >
-            {loading ? "Please wait..." : online ? "Go Offline" : "Go Online"}
-          </button>
-        </div>
-
-        {/* ERROR */}
-        {error && (
-          <div className="bg-red-900/30 border border-red-700 text-red-400 p-3 rounded-lg">
-            {error}
-          </div>
-        )}
-
-        {/* RIDE REQUEST */}
-        {ride && ride.status === "REQUESTED" && (
-          <RideRequestCard
-            ride={ride}
-            onAccept={handleAccept}
-            onReject={handleReject}
-          />
-        )}
-
-        {/* ACCEPTED */}
-        {ride && ride.status === "ACCEPTED" && (
-          <DriverRideStart ride={ride} />
-        )}
       </div>
     </div>
   );

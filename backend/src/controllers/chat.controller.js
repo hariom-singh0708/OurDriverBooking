@@ -7,15 +7,19 @@ import { getIO } from "../config/socket.js";
 export const sendMessage = async (req, res) => {
   const { rideId, message } = req.body;
 
-  const chat = await Chat.create({
+  let chat = await Chat.create({
     rideId,
     senderId: req.user._id,
     message,
   });
+    chat = await chat.populate("senderId", "role name");
+    const senderRole = chat.senderId.role;
 
   const io = getIO();
   io.to(rideId).emit("chat_message", {
     senderId: req.user._id,
+          senderRole,
+
     message,
     createdAt: chat.createdAt,
   });
@@ -32,7 +36,8 @@ export const sendMessage = async (req, res) => {
 export const getChatHistory = async (req, res) => {
   const chats = await Chat.find({
     rideId: req.params.rideId,
-  }).sort({ createdAt: 1 });
+  }).sort({ createdAt: 1 })      .populate("senderId", "role name");   // 🔥 ROLE POPULATE
+;
 
   res.json({
     success: true,

@@ -11,6 +11,8 @@ import {
   updateDriverBankDetails,
   getDriverProfile,
   updateDriverProfilePhoto,
+  createDriverSupportTicket,
+  deleteDriverAccount
 } from "../controllers/driver.controller.js";
 
 import {
@@ -42,6 +44,12 @@ router.put(
   upload.single("photo"),
   updateDriverProfilePhoto
 );
+
+// ❌ DANGER ZONE - DELETE DRIVER ACCOUNT
+router.delete("/account", protect, deleteDriverAccount);
+
+
+router.post("/support", protect, createDriverSupportTicket);
 
 
 export default router;

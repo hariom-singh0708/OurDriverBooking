@@ -1,30 +1,57 @@
-// src/utils/sendEmail.js
-import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 dotenv.config();
 
+import nodemailer from "nodemailer";
+
+const {
+  EMAIL_HOST,
+  EMAIL_PORT,
+  EMAIL_USER,
+  EMAIL_PASS,
+  NODE_ENV,
+} = process.env;
+
+if (!EMAIL_HOST || !EMAIL_PORT || !EMAIL_USER || !EMAIL_PASS) {
+  console.warn("⚠️ Email service not fully configured");
+}
+
 const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: Number(process.env.EMAIL_PORT),
-  secure: false, // 587
+  host: EMAIL_HOST,
+  port: Number(EMAIL_PORT),
+  secure: Number(EMAIL_PORT) === 465, // 465 = true, 587 = false
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
+    user: EMAIL_USER,
+    pass: EMAIL_PASS,
   },
+  tls: {
+    rejectUnauthorized: false, // 🔥 prevents Gmail TLS close issue
+  },
+  connectionTimeout: 10000,
 });
 
-transporter.verify((err) => {
-  if (err) console.error("❌ SMTP ERROR:", err);
-  else console.log("✅ SMTP READY");
-});
+/* ❌ REMOVE VERIFY (Not needed in production) */
+// Gmail often closes idle verify connection
 
 export const sendEmail = async ({ to, subject, html }) => {
-  const info = await transporter.sendMail({
-    from: `"Driver Booking" <${process.env.EMAIL_USER}>`,
-    to,
-    subject,
-    html,
-  });
+  if (!to || !subject || !html) {
+    throw new Error("Invalid email parameters");
+  }
 
-  console.log("📧 Mail sent:", info.messageId);
+  try {
+    const info = await transporter.sendMail({
+      from: `"Driver Booking" <${EMAIL_USER}>`,
+      to,
+      subject,
+      html,
+    });
+
+    if (NODE_ENV === "development") {
+      console.log("📧 Mail sent:", info.messageId);
+    }
+
+    return info;
+  } catch (error) {
+    console.error("❌ Email sending failed:", error.message);
+    throw error;
+  }
 };

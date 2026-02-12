@@ -1,9 +1,10 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "http://localhost:5000/fare",
+  baseURL: `${import.meta.env.VITE_API_BASE_URL}/fare`,
 });
 
+/* ================= FARE ESTIMATE ================= */
 export const getFareEstimate = (data) =>
   API.post("/estimate", data, {
     headers: {

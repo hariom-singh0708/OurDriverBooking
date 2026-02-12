@@ -23,47 +23,52 @@ export const getDriverRideRequest = async (req, res) => {
  */
 
 export const acceptRide = async (req, res) => {
-  const ride = await Ride.findById(req.params.rideId);
+  const ride = await Ride.findOneAndUpdate(
+    {
+      _id: req.params.rideId,
+      status: "REQUESTED",
+    },
+    {
+      $set: {
+        status: "ACCEPTED",
+        otp: generateRideOTP(),
+        otpVerified: false,
+        requestExpiresAt: null,
+        driverId: req.user._id,
+        assignedAt: new Date(),
+      },
+    },
+    { new: true }
+  );
 
   if (!ride) {
-    return res.status(404).json({ message: "Ride not found" });
+    return res.status(409).json({
+      success: false,
+      message: "Ride already accepted",
+    });
   }
 
-  if (ride.status !== "REQUESTED") {
-    return res.status(400).json({ message: "Invalid ride state" });
-  }
+  const populatedRide = await Ride.findById(ride._id)
+    .populate("clientId", "name mobile profileImage")
+    .populate("driverId", "name mobile profileImage rating vehicleNumber vehicleType");
 
-  ride.status = "ACCEPTED";
-  ride.otp = generateRideOTP();
-  ride.otpVerified = false;
-  ride.requestExpiresAt = null; // 🔥 VERY IMPORTANT
+  const io = getIO();
 
-  await ride.save();
+  io.emit("ride_taken", { rideId: ride._id });
 
-const io = getIO();
+  io.to(ride._id.toString()).emit("ride_status_update", populatedRide);
 
-io.to(ride._id.toString()).emit("ride_details", {
-  _id: ride._id,
-  pickupLocation: ride.pickupLocation,
-  dropLocation: ride.dropLocation,
-  rideType: ride.rideType,
-  paymentMode: ride.paymentMode,
-  fareBreakdown: ride.fareBreakdown,
-  paymentStatus: ride.paymentStatus,
-  status: ride.status,
-});
-
-
-
-  res.json({
+  // 🔥 RETURN FULL RIDE
+  return res.json({
     success: true,
     message: "Ride accepted",
-    data: {
-      rideId: ride._id,
-      otp: ride.otp,
-    },
+    data: populatedRide,
   });
 };
+
+
+
+
 
 
 

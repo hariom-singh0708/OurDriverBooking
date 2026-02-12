@@ -4,41 +4,66 @@ import mongoose from "mongoose";
 const userSchema = new mongoose.Schema(
   {
     /* ================= BASIC AUTH ================= */
-    name: String,
+
+    name: {
+      type: String,
+      trim: true,
+    },
 
     email: {
       type: String,
       required: true,
       unique: true,
       lowercase: true,
+      trim: true,
+      index: true,
     },
 
-    mobile: String,
-    password: String,
+    mobile: {
+      type: String,
+      trim: true,
+    },
+
+    password: {
+      type: String,
+      minlength: 6,
+      select: false, // 🔥 important (never return password by default)
+    },
 
     /* ================= PROFILE PHOTO ================= */
-    // Cloudinary image URL
+
     profileImage: {
       type: String,
       default: null,
     },
 
     /* ================= ROLE ================= */
+
     role: {
       type: String,
       enum: ["client", "driver", "admin"],
       required: true,
+      index: true,
     },
 
     isVerified: {
       type: Boolean,
       default: false,
+      index: true,
     },
 
     /* ================= ACCOUNT SAFETY ================= */
+
     cancelCountToday: {
       type: Number,
       default: 0,
+      min: 0,
+    },
+
+    pendingPenaltyAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
 
     blockedUntil: {
@@ -46,58 +71,65 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
 
-    /* ================= EXTRA PROFILE DETAILS (EDITABLE) ================= */
+    /* ================= PROFILE DETAILS ================= */
+
     gender: {
       type: String,
       enum: ["male", "female", "other"],
+      lowercase: true,
+      trim: true,
+      set: (v) => (v ? v.toLowerCase() : v),
     },
 
-    dob: {
-      type: Date,
-    },
+    dob: Date,
 
     alternateMobile: {
       type: String,
+      trim: true,
     },
 
     emergencyContact: {
-      name: String,
-      phone: String,
+      name: { type: String, trim: true },
+      phone: { type: String, trim: true },
     },
 
     preferredLanguage: {
       type: String,
       default: "English",
+      trim: true,
     },
 
     driverNotes: {
-      type: String, // instructions for driver
+      type: String,
+      trim: true,
+      maxlength: 500,
     },
 
-    /* ================= DRIVER ADDITIONAL DETAILS (FIX) ================= */
+    /* ================= DRIVER DETAILS ================= */
 
-/* ✅ MULTI VEHICLE TYPES (Manual / Automatic / SUV / Luxury) */
-carTypes: {
-  type: [String],
-  default: [],
-},
+    carTypes: {
+      type: [String],
+      default: [],
+    },
 
-/* ✅ CITY WHERE DRIVER PREFERS TO WORK */
-preferredCity: {
-  type: String,
-},
+    preferredCity: {
+      type: String,
+      trim: true,
+    },
 
+    /* ================= SAVED ADDRESSES ================= */
 
-    /* ================= SAVED ADDRESSES (CLIENT) ================= */
     savedAddresses: [
       {
         label: {
           type: String,
-          default: "Other", // Home / Office / Other
+          default: "Other",
+          trim: true,
         },
         address: {
           type: String,
           required: true,
+          trim: true,
         },
         lat: {
           type: Number,
@@ -110,67 +142,60 @@ preferredCity: {
           default: Date.now,
         },
       },
-      
     ],
-        /* ================= RATING (CLIENT) ================= */
+
+    /* ================= RATING ================= */
+
     rating: {
       average: {
         type: Number,
         default: 0,
+        min: 0,
+        max: 5,
       },
       totalRatings: {
         type: Number,
         default: 0,
+        min: 0,
       },
     },
 
+    /* ================= DRIVER ADDITIONAL DETAILS ================= */
 
-        /* ================= DRIVER ADDITIONAL DETAILS ================= */
     drivingExperienceYears: {
       type: Number,
       default: 0,
+      min: 0,
     },
 
     vehicleType: {
-      type: String, // Sedan / SUV / Hatchback
+      type: String,
+      trim: true,
     },
 
     licenseNumber: {
       type: String,
+      trim: true,
     },
 
-    licenseExpiry: {
-      type: Date,
-    },
+    licenseExpiry: Date,
 
     /* ================= DRIVER BANK DETAILS ================= */
+
     bankDetails: {
-      accountHolderName: {
-        type: String,
-      },
-      accountNumber: {
-        type: String,
-      },
-      ifscCode: {
-        type: String,
-      },
-      bankName: {
-        type: String,
-      },
-      branchName: {
-        type: String,
-      },
+      accountHolderName: { type: String, trim: true },
+      accountNumber: { type: String, trim: true },
+      ifscCode: { type: String, trim: true },
+      bankName: { type: String, trim: true },
+      branchName: { type: String, trim: true },
       isVerifiedByAdmin: {
         type: Boolean,
         default: false,
       },
     },
-    
-
   },
   { timestamps: true }
 );
 
+
 export default mongoose.model("User", userSchema);
-
-

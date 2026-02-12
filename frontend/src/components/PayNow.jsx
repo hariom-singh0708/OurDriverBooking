@@ -1,4 +1,5 @@
 import { createOrder, verifyPayment } from "../services/payment.api";
+import toast from "react-hot-toast";
 
 export default function PayNow({ rideId }) {
   const pay = async () => {
@@ -12,7 +13,7 @@ export default function PayNow({ rideId }) {
       order_id: orderId,
       handler: async (response) => {
         await verifyPayment(response);
-        alert("Payment Successful");
+        toast.success("Payment Successful");
       },
     };
 

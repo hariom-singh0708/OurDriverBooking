@@ -4,7 +4,35 @@ import KYC from "../models/KYC.model.js";
 import UserModel from "../models/User.model.js";
 import DriverStatusModel from "../models/DriverStatus.model.js";
 import razorpay from "../config/razorpay.js";
+import { setSurgeMode, getSurgeMode } from "../services/fare.service.js";
 
+// Toggle Peak / Festival
+export const toggleSurge = (req, res) => {
+  const { type } = req.body; // "peak" | "festival"
+
+  if (!["peak", "festival"].includes(type)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid surge type",
+    });
+  }
+
+  const updated = setSurgeMode(type);
+
+  res.json({
+    success: true,
+    message: "Surge mode updated",
+    data: updated,
+  });
+};
+
+// Get Current Status
+export const getSurgeStatus = (req, res) => {
+  res.json({
+    success: true,
+    data: getSurgeMode(),
+  });
+};
 
 const ACTIVE_STATUSES = ["REQUESTED", "ACCEPTED", "DRIVER_ARRIVED", "ON_RIDE"];
 
@@ -16,7 +44,10 @@ export const getAdminStats = async (req, res) => {
     const [totalRides, activeRides, completedToday] = await Promise.all([
       Ride.countDocuments({}),
       Ride.countDocuments({ status: { $in: ACTIVE_STATUSES } }),
-      Ride.countDocuments({ status: "COMPLETED", completedAt: { $gte: startOfToday } }),
+      Ride.countDocuments({
+        status: "COMPLETED",
+        completedAt: { $gte: startOfToday },
+      }),
     ]);
 
     return res.json({
@@ -29,14 +60,107 @@ export const getAdminStats = async (req, res) => {
   }
 };
 
+// export const listDrivers = async (req, res) => {
+//   try {
+//     const {
+//       q = "",
+//       preferredCity = "",
+//       isOnline,             // "true" | "false" | undefined
+//       // isAvailable,        // ❌ DriverStatus schema me nahi hai
+//       kycStatus,
+//       page = 1,
+//       limit = 20,
+//     } = req.query;
+
+//     const pageNum = Math.max(1, Number(page) || 1);
+//     const limitNum = Math.min(100, Math.max(1, Number(limit) || 20));
+//     const skip = (pageNum - 1) * limitNum;
+
+//     // 1) Users (drivers)
+//     const userMatch = { role: "driver" };
+
+//     if (q.trim()) {
+//       const qq = q.trim();
+//       userMatch.$or = [
+//         { name: { $regex: qq, $options: "i" } },
+//         { email: { $regex: qq, $options: "i" } },
+//         { mobile: { $regex: qq, $options: "i" } },
+//       ];
+//     }
+
+//     const [drivers, total] = await Promise.all([
+//       UserModel.find(userMatch)
+//         .select("-password")
+//         .sort({ createdAt: -1 })
+//         .skip(skip)
+//         .limit(limitNum)
+//         .lean(),
+//       UserModel.countDocuments(userMatch),
+//     ]);
+
+//     const driverIds = drivers.map((d) => d._id);
+
+//     // 2) DriverStatus (driverId)
+//     const statusMatch = { driverId: { $in: driverIds } };
+
+//     if (typeof isOnline !== "undefined" && isOnline !== "") {
+//       statusMatch.isOnline = String(isOnline) === "true";
+//     }
+
+//     // ✅ Only add if your schema really has city, else remove this block
+//     if (preferredCity) {
+//       statusMatch.preferredCity = preferredCity;
+//     }
+
+//     const statuses = await DriverStatusModel.find(statusMatch).lean();
+//     const statusMap = new Map(statuses.map((s) => [String(s.driverId), s]));
+
+//     // 3) KYC (userId)
+//     const kycs = await KYC.find({ userId: { $in: driverIds } }).lean();
+//     const kycMap = new Map(kycs.map((k) => [String(k.userId), k]));
+
+//     // 4) Merge
+//     let data = drivers.map((d) => {
+//       const st = statusMap.get(String(d._id)) || null;
+//       const kyc = kycMap.get(String(d._id)) || null;
+
+//       return {
+//         ...d,
+//         status: st,            // ✅ frontend uses d.status?.isOnline / lastSeen / location
+//         driverStatus: st,      // (optional) keep for debugging if you want
+//         kyc,
+//         isBlocked: d.blockedUntil ? new Date(d.blockedUntil) > new Date() : false,
+//       };
+//     });
+
+//     // 5) Filter by kycStatus (submitted/under_review/approved)
+//     if (kycStatus) {
+//       const want = String(kycStatus).toLowerCase();
+//       data = data.filter((x) => (x.kyc?.status || "").toLowerCase() === want);
+//     }
+
+//     return res.json({
+//       success: true,
+//       data,
+//       pagination: {
+//         page: pageNum,
+//         limit: limitNum,
+//         total,
+//         pages: Math.ceil(total / limitNum),
+//       },
+//     });
+//   } catch (err) {
+//     console.error("listDrivers error:", err);
+//     return res.status(500).json({ message: "Server error" });
+//   }
+// };
 
 export const listDrivers = async (req, res) => {
   try {
     const {
       q = "",
-      city = "",            // (optional) only if your DriverStatus has city
-      isOnline,             // "true" | "false" | undefined
-      // isAvailable,        // ❌ DriverStatus schema me nahi hai
+      preferredCity = "",
+      isOnline,
       kycStatus,
       page = 1,
       limit = 20,
@@ -46,7 +170,7 @@ export const listDrivers = async (req, res) => {
     const limitNum = Math.min(100, Math.max(1, Number(limit) || 20));
     const skip = (pageNum - 1) * limitNum;
 
-    // 1) Users (drivers)
+    // ✅ 1) Users (drivers)
     const userMatch = { role: "driver" };
 
     if (q.trim()) {
@@ -56,6 +180,13 @@ export const listDrivers = async (req, res) => {
         { email: { $regex: qq, $options: "i" } },
         { mobile: { $regex: qq, $options: "i" } },
       ];
+    }
+
+    // ✅ FIX: City filter should be on User model (preferredCity lives in User)
+    if (preferredCity && String(preferredCity).trim()) {
+      userMatch.preferredCity = String(preferredCity).trim();
+      // Agar case-insensitive chahiye to:
+      // userMatch.preferredCity = { $regex: `^${String(preferredCity).trim()}$`, $options: "i" };
     }
 
     const [drivers, total] = await Promise.all([
@@ -70,40 +201,36 @@ export const listDrivers = async (req, res) => {
 
     const driverIds = drivers.map((d) => d._id);
 
-    // 2) DriverStatus (driverId)
+    // ✅ 2) DriverStatus (only isOnline filter here)
     const statusMatch = { driverId: { $in: driverIds } };
 
     if (typeof isOnline !== "undefined" && isOnline !== "") {
       statusMatch.isOnline = String(isOnline) === "true";
     }
 
-    // ✅ Only add if your schema really has city, else remove this block
-    if (city) {
-      statusMatch.city = city;
-    }
-
     const statuses = await DriverStatusModel.find(statusMatch).lean();
     const statusMap = new Map(statuses.map((s) => [String(s.driverId), s]));
 
-    // 3) KYC (userId)
+    // ✅ 3) KYC
     const kycs = await KYC.find({ userId: { $in: driverIds } }).lean();
     const kycMap = new Map(kycs.map((k) => [String(k.userId), k]));
 
-    // 4) Merge
+    // ✅ 4) Merge
     let data = drivers.map((d) => {
       const st = statusMap.get(String(d._id)) || null;
       const kyc = kycMap.get(String(d._id)) || null;
 
       return {
         ...d,
-        status: st,            // ✅ frontend uses d.status?.isOnline / lastSeen / location
-        driverStatus: st,      // (optional) keep for debugging if you want
+        driverStatus: st, // frontend uses d.driverStatus?.isOnline etc.
         kyc,
-        isBlocked: d.blockedUntil ? new Date(d.blockedUntil) > new Date() : false,
+        isBlocked: d.blockedUntil
+          ? new Date(d.blockedUntil) > new Date()
+          : false,
       };
     });
 
-    // 5) Filter by kycStatus (submitted/under_review/approved)
+    // ✅ 5) Filter by kycStatus
     if (kycStatus) {
       const want = String(kycStatus).toLowerCase();
       data = data.filter((x) => (x.kyc?.status || "").toLowerCase() === want);
@@ -127,13 +254,30 @@ export const listDrivers = async (req, res) => {
 
 export const listRides = async (req, res) => {
   try {
-    const { status, from, to, driverId, clientId, page = 1, limit = 20 } = req.query;
+    const {
+      status,
+      from,
+      to,
+      driverId,
+      city,
+      clientId,
+      page = 1,
+      limit = 20,
+    } = req.query;
 
     const pageNum = Math.max(1, Number(page) || 1);
     const limitNum = Math.min(100, Math.max(1, Number(limit) || 20));
     const skip = (pageNum - 1) * limitNum;
 
     const match = {};
+
+    if (city) {
+      const c = String(city).trim();
+      match.$or = [
+        { "pickupLocation.address": { $regex: c, $options: "i" } },
+        { "dropLocation.address": { $regex: c, $options: "i" } },
+      ];
+    }
     if (status) match.status = String(status).toUpperCase();
     if (driverId) match.driverId = driverId;
     if (clientId) match.clientId = clientId;
@@ -146,7 +290,7 @@ export const listRides = async (req, res) => {
 
     const [items, total] = await Promise.all([
       Ride.find(match)
-        .populate("driverId", "name email mobile role")
+        .populate("driverId", "name email mobile role preferredCity")
         .populate("clientId", "name email mobile role")
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -157,7 +301,12 @@ export const listRides = async (req, res) => {
     return res.json({
       success: true,
       data: items,
-      pagination: { page: pageNum, limit: limitNum, total, pages: Math.ceil(total / limitNum) },
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        pages: Math.ceil(total / limitNum),
+      },
     });
   } catch (err) {
     console.error("listRides error:", err);
@@ -190,7 +339,8 @@ export const toggleDriverBlock = async (req, res) => {
     const driver = await User.findOne({ _id: driverId, role: "driver" });
     if (!driver) return res.status(404).json({ message: "Driver not found" });
 
-    if (block) driver.blockedUntil = new Date(Date.now() + Number(minutes) * 60 * 1000);
+    if (block)
+      driver.blockedUntil = new Date(Date.now() + Number(minutes) * 60 * 1000);
     else driver.blockedUntil = null;
 
     await driver.save();
@@ -217,7 +367,6 @@ export const getAdminProfile = async (req, res) => {
     data: user,
   });
 };
-
 
 export const setupDriverPayout = async (req, res) => {
   const { driverId } = req.params;
@@ -269,4 +418,3 @@ export const setupDriverPayout = async (req, res) => {
     fundAccountId: fundAccount.id,
   });
 };
-
